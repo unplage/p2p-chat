@@ -89,11 +89,6 @@
         .net-warning.show { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
         
-        /* Loading Spinner */
-        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; margin-right: 6px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        /* Utility */
         .hidden { display: none !important; }
         .text-center { text-align: center; }
         .mt-10 { margin-top: 10px; }
@@ -264,12 +259,10 @@
 
 <script>
 // ============== 配置 ==============
-// 使用公共STUN + TURN服务器（解决GitHub Pages部署后NAT穿透问题）
 const iceConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        // 使用免费的TURN服务器（可能有流量限制，建议自行注册）
         {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -286,17 +279,17 @@ const iceConfig = {
 
 // ============== 全局状态 ==============
 let pc = null;
-let dc = null; // DataChannel
+let dc = null;
 let localStream = null;
 let remoteStream = null;
-let currentMode = null; // 'create' 或 'join'
+let currentMode = null;
 let isConnected = false;
-let pendingCandidates = []; // 暂存ICE候选
-let reconnectAttempts = 0;
+let isInCall = false; // 标记是否正在通话中
+let callSenders = []; // 存储通话期间添加的senders，用于结束后清理
+let pendingCandidates = [];
 
 // ============== 初始化 ==============
 function init() {
-    // 页面可见性变化时处理
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && pc && pc.connectionState === 'disconnected') {
             showNetWarning(true);
@@ -304,7 +297,6 @@ function init() {
     });
 }
 
-// ============== 连接管理 ==============
 function showConnModal() {
     document.getElementById('connModal').classList.add('active');
     resetModal();
@@ -345,7 +337,6 @@ function updateStep(step) {
 function createPeer() {
     pc = new RTCPeerConnection(iceConfig);
     
-    // 连接状态监控
     pc.onconnectionstatechange = () => {
         console.log('连接状态:', pc.connectionState);
         const badge = document.getElementById('connBadge');
@@ -369,29 +360,47 @@ function createPeer() {
             document.getElementById('voiceBtn').disabled = true;
             if (isConnected) {
                 isConnected = false;
-                addSystemMsg('⚠️ 连接已断开，请重连');
-                attemptReconnect();
+                addSystemMsg('⚠️ 连接已断开');
             }
         }
     };
 
-    // ICE处理（关键：收集候选并发送）
     pc.onicecandidate = (e) => {
         if (e.candidate) {
             console.log('ICE候选:', e.candidate);
-            // 在实际应用中，这里应通过信令通道发送
-            // 但由于我们手动交换SDP，ICE已经包含在SDP中
         }
     };
 
-    // 数据通道（接收方）
     pc.ondatachannel = (e) => {
         setupDataChannel(e.channel);
     };
 
-    // 媒体流（通话）
     pc.ontrack = (e) => {
-        document.getElementById('remoteVideo').srcObject = e.streams[0];
+        console.log('收到远程轨道:', e.track.kind);
+        remoteStream = e.streams[0];
+        const remoteVideo = document.getElementById('remoteVideo');
+        if (remoteVideo.srcObject !== remoteStream) {
+            remoteVideo.srcObject = remoteStream;
+        }
+    };
+    
+    // 关键：监听重新协商事件
+    pc.onnegotiationneeded = async () => {
+        console.log('需要重新协商');
+        // 如果正在通话中，由发起方处理重新协商
+        if (isInCall && currentMode === 'create') {
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                await waitForIceComplete();
+                dc.send(JSON.stringify({
+                    type: 'renegotiate',
+                    sdp: btoa(JSON.stringify(pc.localDescription))
+                }));
+            } catch (err) {
+                console.error('重新协商失败:', err);
+            }
+        }
     };
     
     return pc;
@@ -401,22 +410,17 @@ function createPeer() {
 async function createOffer() {
     createPeer();
     
-    // 创建数据通道（文字、图片）
     dc = pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
     setupDataChannel(dc);
     
     try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        
-        // 等待ICE收集完成（使用Trickle ICE优化）
         await waitForIceComplete();
         
-        const sdp = pc.localDescription;
-        const code = btoa(JSON.stringify(sdp));
+        const code = btoa(JSON.stringify(pc.localDescription));
         document.getElementById('offerCode').value = code;
         
-        // 自动选择文本方便复制（移动端）
         setTimeout(() => {
             document.getElementById('offerCode').select();
         }, 100);
@@ -439,7 +443,6 @@ async function createAnswer() {
         
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        
         await waitForIceComplete();
         
         const code = btoa(JSON.stringify(pc.localDescription));
@@ -453,7 +456,6 @@ async function createAnswer() {
             document.getElementById('joinAnswer').select();
         }, 100);
         
-        // 接收方保持监听连接状态
         checkConnectionStatus();
         
     } catch (err) {
@@ -469,8 +471,6 @@ async function completeConnection() {
     try {
         const answer = JSON.parse(atob(answerStr));
         await pc.setRemoteDescription(answer);
-        
-        // 等待连接建立
         await waitForConnection();
         
         document.getElementById('successView').classList.remove('hidden');
@@ -482,11 +482,9 @@ async function completeConnection() {
     }
 }
 
-// 等待ICE收集（带超时保护）
 function waitForIceComplete() {
     return new Promise((resolve) => {
         if (pc.iceGatheringState === 'complete') return resolve();
-        
         const check = () => {
             if (pc.iceGatheringState === 'complete') {
                 pc.removeEventListener('icegatheringstatechange', check);
@@ -494,11 +492,10 @@ function waitForIceComplete() {
             }
         };
         pc.addEventListener('icegatheringstatechange', check);
-        setTimeout(resolve, 2000); // 最多等2秒
+        setTimeout(resolve, 2000);
     });
 }
 
-// 等待连接建立
 function waitForConnection() {
     return new Promise((resolve, reject) => {
         let attempts = 0;
@@ -506,15 +503,14 @@ function waitForConnection() {
             if (pc.connectionState === 'connected') {
                 clearInterval(check);
                 resolve();
-            } else if (++attempts > 20) { // 10秒超时
+            } else if (++attempts > 20) {
                 clearInterval(check);
-                reject(new Error('连接超时，请检查网络或代码是否正确'));
+                reject(new Error('连接超时'));
             }
         }, 500);
     });
 }
 
-// 检查连接状态（接收方用）
 function checkConnectionStatus() {
     const interval = setInterval(() => {
         if (pc.connectionState === 'connected') {
@@ -526,13 +522,10 @@ function checkConnectionStatus() {
             document.getElementById('voiceBtn').disabled = false;
             document.getElementById('connBadge').textContent = '已加密';
             document.getElementById('connBadge').classList.add('connected');
-        } else if (pc.connectionState === 'failed') {
-            clearInterval(interval);
         }
     }, 1000);
 }
 
-// 设置数据通道
 function setupDataChannel(channel) {
     dc = channel;
     
@@ -553,11 +546,33 @@ function setupDataChannel(channel) {
     channel.onmessage = (e) => {
         try {
             const data = JSON.parse(e.data);
-            handleIncomingData(data);
+            if (data.type === 'renegotiate') {
+                // 处理重新协商
+                handleRenegotiate(data);
+            } else {
+                handleIncomingData(data);
+            }
         } catch (err) {
             console.error('消息解析失败:', err);
         }
     };
+}
+
+async function handleRenegotiate(data) {
+    try {
+        const desc = JSON.parse(atob(data.sdp));
+        await pc.setRemoteDescription(desc);
+        if (desc.type === 'offer') {
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            dc.send(JSON.stringify({
+                type: 'renegotiate-answer',
+                sdp: btoa(JSON.stringify(answer))
+            }));
+        }
+    } catch (err) {
+        console.error('重新协商处理失败:', err);
+    }
 }
 
 // ============== 消息处理 ==============
@@ -572,6 +587,17 @@ function handleIncomingData(data) {
         handleCallAnswer(data);
     } else if (data.type === 'call-end') {
         endCall();
+    } else if (data.type === 'renegotiate-answer') {
+        handleRenegotiateAnswer(data);
+    }
+}
+
+async function handleRenegotiateAnswer(data) {
+    try {
+        const desc = JSON.parse(atob(data.sdp));
+        await pc.setRemoteDescription(desc);
+    } catch (err) {
+        console.error('处理重协商应答失败:', err);
     }
 }
 
@@ -593,13 +619,11 @@ async function handleImageSelect(input) {
         return;
     }
     
-    // 限制大小（DataChannel有缓冲区限制）
     if (file.size > 2 * 1024 * 1024) {
         alert('图片过大，请选择小于2MB的图片');
         return;
     }
     
-    // 压缩图片
     try {
         const compressed = await compressImage(file, 800, 0.7);
         dc.send(JSON.stringify({ type: 'image', content: compressed }));
@@ -632,31 +656,47 @@ function compressImage(file, maxWidth, quality) {
                 ctx.drawImage(img, 0, 0, width, height);
                 resolve(canvas.toDataURL('image/jpeg', quality));
             };
+            img.onerror = reject;
             img.src = e.target.result;
         };
+        reader.onerror = reject;
         reader.readAsDataURL(file);
     });
 }
 
-// ============== 音视频通话 ==============
+// ============== 音视频通话（修复多次通话问题）=============
+
 async function startCall(type) {
-    if (!pc) {
+    if (!pc || !isConnected) {
         alert('请先建立P2P连接');
         return;
     }
     
+    // 检查是否已在通话中
+    if (isInCall) {
+        alert('正在进行通话，请先结束当前通话');
+        return;
+    }
+    
     try {
+        // 1. 获取媒体流
         const constraints = type === 'video' ? { video: true, audio: true } : { video: false, audio: true };
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
         
+        // 2. 显示本地视频
         document.getElementById('localVideo').srcObject = localStream;
         
-        // 添加轨道到PC
+        // 3. 重置发送器数组
+        callSenders = [];
+        
+        // 4. 添加轨道到PeerConnection并记录sender
         localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
+            const sender = pc.addTrack(track, localStream);
+            callSenders.push(sender);
+            console.log('添加轨道:', track.kind, 'Sender:', sender);
         });
         
-        // 创建Offer并发送
+        // 5. 创建Offer并发送
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await waitForIceComplete();
@@ -667,9 +707,14 @@ async function startCall(type) {
             callType: type
         }));
         
+        // 6. 标记通话状态并显示UI
+        isInCall = true;
         showCallUI();
+        addSystemMsg(type === 'video' ? '📹 视频通话开始' : '📞 语音通话开始');
         
     } catch (err) {
+        // 清理失败的资源
+        cleanupLocalStream();
         if (err.name === 'NotAllowedError') {
             alert('请允许摄像头/麦克风权限');
         } else {
@@ -686,15 +731,33 @@ async function handleCallOffer(data) {
         return;
     }
     
+    // 检查是否已在通话中
+    if (isInCall) {
+        alert('已有正在进行的通话');
+        return;
+    }
+    
     try {
+        // 1. 如果已有本地流（异常情况），先清理
+        if (localStream) {
+            cleanupLocalStream();
+        }
+        
+        // 2. 获取媒体流
         const constraints = data.callType === 'video' ? { video: true, audio: true } : { video: false, audio: true };
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
         document.getElementById('localVideo').srcObject = localStream;
         
+        // 3. 重置发送器数组
+        callSenders = [];
+        
+        // 4. 添加轨道并记录sender
         localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
+            const sender = pc.addTrack(track, localStream);
+            callSenders.push(sender);
         });
         
+        // 5. 处理Offer并创建Answer
         const offer = JSON.parse(atob(data.sdp));
         await pc.setRemoteDescription(offer);
         
@@ -707,9 +770,13 @@ async function handleCallOffer(data) {
             sdp: btoa(JSON.stringify(answer))
         }));
         
+        // 6. 标记状态并显示UI
+        isInCall = true;
         showCallUI();
+        addSystemMsg(data.callType === 'video' ? '📹 接听视频通话' : '📞 接听语音通话');
         
     } catch (err) {
+        cleanupLocalStream();
         alert('接听失败: ' + err.message);
     }
 }
@@ -718,8 +785,80 @@ async function handleCallAnswer(data) {
     try {
         const answer = JSON.parse(atob(data.sdp));
         await pc.setRemoteDescription(answer);
+        console.log('通话连接已建立');
     } catch (err) {
         console.error('处理应答失败:', err);
+        // 如果处理失败，结束通话并清理
+        endCall();
+    }
+}
+
+// ========== 关键修复：结束通话时正确清理 ==========
+function endCall() {
+    console.log('结束通话，清理资源...');
+    
+    // 1. 重置状态标记（必须在清理资源前，防止事件触发器重复操作）
+    isInCall = false;
+    
+    // 2. 发送结束信号（必须在清理前发送）
+    if (dc && dc.readyState === 'open') {
+        dc.send(JSON.stringify({ type: 'call-end' }));
+    }
+    
+    // 3. 从PeerConnection中移除所有senders（关键步骤）
+    if (pc && callSenders.length > 0) {
+        callSenders.forEach(sender => {
+            if (pc.getSenders().includes(sender)) {
+                try {
+                    pc.removeTrack(sender);
+                    console.log('已移除Sender:', sender);
+                } catch (e) {
+                    console.log('移除Sender失败:', e);
+                }
+            }
+        });
+        callSenders = [];
+    }
+    
+    // 4. 停止并清理本地媒体流
+    cleanupLocalStream();
+    
+    // 5. 重置视频元素
+    const remoteVideo = document.getElementById('remoteVideo');
+    const localVideo = document.getElementById('localVideo');
+    
+    if (remoteVideo) {
+        remoteVideo.pause();
+        remoteVideo.srcObject = null;
+    }
+    
+    if (localVideo) {
+        localVideo.pause();
+        localVideo.srcObject = null;
+    }
+    
+    // 6. 隐藏UI
+    document.getElementById('callOverlay').classList.remove('active');
+    
+    // 7. 重置静音按钮状态
+    const muteBtn = document.getElementById('muteBtn');
+    if (muteBtn) {
+        muteBtn.classList.remove('muted');
+        muteBtn.textContent = '🎤';
+    }
+    
+    addSystemMsg('📴 通话已结束');
+    console.log('通话资源清理完成');
+}
+
+// 辅助函数：清理本地媒体流
+function cleanupLocalStream() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('已停止轨道:', track.kind);
+        });
+        localStream = null;
     }
 }
 
@@ -727,21 +866,14 @@ function showCallUI() {
     document.getElementById('callOverlay').classList.add('active');
 }
 
-function endCall() {
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    document.getElementById('callOverlay').classList.remove('active');
-    if (dc) dc.send(JSON.stringify({ type: 'call-end' }));
-}
-
 function toggleMute() {
     if (localStream) {
         const audio = localStream.getAudioTracks()[0];
         if (audio) {
             audio.enabled = !audio.enabled;
-            document.getElementById('muteBtn').classList.toggle('muted', !audio.enabled);
+            const btn = document.getElementById('muteBtn');
+            btn.classList.toggle('muted', !audio.enabled);
+            btn.textContent = audio.enabled ? '🎤' : '🎙️❌';
         }
     }
 }
@@ -802,7 +934,6 @@ function copyText(id) {
     el.select();
     try {
         document.execCommand('copy');
-        // 移动端震动反馈
         if (navigator.vibrate) navigator.vibrate(50);
         showToast('已复制');
     } catch(e) {
@@ -822,19 +953,6 @@ function showNetWarning(show) {
     document.getElementById('netWarning').classList.toggle('show', show);
 }
 
-function attemptReconnect() {
-    if (reconnectAttempts < 3) {
-        reconnectAttempts++;
-        setTimeout(() => {
-            if (!isConnected && currentMode) {
-                addSystemMsg(`正在尝试重连... (${reconnectAttempts}/3)`);
-                // 实际重连逻辑需要重新交换SDP，这里简单提示
-            }
-        }, 2000);
-    }
-}
-
-// 步骤导航
 function goToCreateStep2() {
     if (!document.getElementById('offerCode').value) {
         alert('请先生成连接码');
