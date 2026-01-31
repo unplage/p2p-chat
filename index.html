@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 关键：优化移动端视口设置，支持安全区域 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>WeChat P2P - 安全点对点通信</title>
+    <style>
+        :root {
+            --sat: env(safe-area-inset-top);
+            --sar: env(safe-area-inset-right);
+            --sab: env(safe-area-inset-bottom);
+            --sal: env(safe-area-inset-left);
+            --primary-color: #07C160;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #1a1a1a;
+            /* 修复：使用100dvh代替100vh，适应移动端浏览器导航栏 */
+            height: 100dvh;
+            overflow: hidden;
+            color: #333;
+            position: fixed;
+            width: 100%;
+            /* 适配刘海屏 */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .container {
+            display: flex;
+            height: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            /* 确保内容在安全区域内 */
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* 左侧边栏 */
+        .sidebar {
+            width: 280px;
+            background: #2e2e2e;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #1a1a1a;
+            display: none; /* 移动端默认隐藏侧边栏 */
+        }
+
+        /* 主聊天区 - 移动端全屏 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f5f5f5;
+            width: 100%;
+            position: relative;
+            /* 确保底部不会被遮挡 */
+            padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+        }
+
+        /* 移动端侧边栏切换按钮 */
+        .mobile-menu-btn {
+            display: block;
+            position: fixed;
+            top: max(15px, env(safe-area-inset-top));
+            left: 15px;
+            z-index: 100;
+            width: 40px;
+            height: 40px;
+            background: rgba(0,0,0,0.6);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-header {
+            padding: 15px 20px;
+            padding-top: max(15px, env(safe-area-inset-top));
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-left: 60px; /* 给菜单按钮留空间 */
+        }
+
+        .chat-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 消息区域 - 关键修复：计算高度避免底部被遮挡 */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
+            padding-bottom: 100px; /* 确保底部消息不被输入框遮挡 */
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            -webkit-overflow-scrolling: touch; /* 平滑滚动 */
+        }
+
+        /* 输入区域 - 关键修复：固定在安全区域上方 */
+        .input-area {
+            background: #f5f5f5;
+            border-top: 1px solid #e0e0e0;
+            padding: 10px 15px;
+            padding-bottom: max(10px, env(safe-area-inset-bottom));
+            width: 100%;
+            /* 移动端确保在可视区域内 */
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+
+        .input-toolbar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 8px;
+        }
+
+        .tool-btn {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.2s;
+            position: relative;
+            padding: 5px;
+        }
+
+        .input-box {
+            display: flex;
+            gap: 8px;
+            background: #fff;
+            border-radius: 20px;
+            padding: 8px 15px;
+            border: 1px solid #e0e0e0;
+            align-items: flex-end;
+        }
+
+        .message-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 16px; /* 移动端最小16px防止缩放 */
+            resize: none;
+            max-height: 100px;
+            font-family: inherit;
+            padding: 5px;
+            line-height: 1.4;
+        }
+
+        .send-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+        }
+
+        /* 移动端侧边栏遮罩 */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+            display: none;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* 侧边栏在移动端的样式 */
+        @media (min-width: 769px) {
+            .sidebar {
+                display: flex !important;
+            }
+            .mobile-menu-btn {
+                display: none !important;
+            }
+            .chat-header {
+                padding-left: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+                z-index: 1000;
+                transition: transform 0.3s ease;
+                display: flex;
+                width: 280px;
+                max-width: 80%;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            }
+            
+            .sidebar.active {
+                transform: translateX(280px);
+            }
+
+            .sidebar .user-profile {
+                padding-top: max(20px, env(safe-area-inset-top));
+            }
+
+            .message {
+                max-width: 85%;
+            }
+
+            .message-image {
+                max-width: 200px;
+                max-height: 200px;
+            }
+        }
+
+        /* 权限提示模态框 */
+        .permission-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .permission-modal.active {
+            display: flex;
+        }
+
+        .permission-content {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .permission-header {
+            padding: 20px;
+            background: var(--primary-color);
+            color: white;
+            text-align: center;
+        }
+
+        .permission-header h3 {
+            margin: 10px 0 5px 0;
+            font-size: 18px;
+        }
+
+        .permission-body {
+            padding: 20px;
+        }
+
+        .permission-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 12px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .permission-icon {
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+
+        .permission-text h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+
+        .permission-text p {
+            margin: 0;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .permission-steps {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .permission-steps h5 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .permission-steps ol {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: #555;
+            line-height: 2;
+        }
+
+        .permission-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .permission-btn.secondary {
+            background: #f0f0f0;
+            color: #333;
+            margin-top: 8px;
+        }
+
+        /* 系统消息优化 */
+        .system-message {
+            align-self: center;
+            background: rgba(0,0,0,0.05);
+            color: #666;
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 12px;
+            margin: 5px 0;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        /* Toast优化 */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 4000;
+            display: none;
+            text-align: center;
+            max-width: 80%;
+            backdrop-filter: blur(10px);
+        }
+
+        .toast.show {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -40%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        /* 连接状态提示 */
+        .connection-hint {
+            position: fixed;
+            top: max(60px, env(safe-area-inset-top) + 40px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            z-index: 50;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            white-space: nowrap;
+        }
+
+        .connection-hint.show {
+            display: flex;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from { transform: translate(-50%, -20px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        /* 其他原有样式保持不变，略... */
+        .chat-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .icon-btn:hover {
+            background: #e0e0e0;
+            color: var(--primary-color);
+        }
+
+        .message {
+            display: flex;
+            gap: 10px;
+            max-width: 70%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.sent {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+
+        .message.sent .message-avatar {
+            background: var(--primary-color);
+        }
+
+        .message.received .message-avatar {
+            background: #999;
+        }
+
+        .message-content {
+            background: #fff;
+            padding: 10px 14px;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            word-wrap: break-word;
+            position: relative;
+            max-width: 100%;
+        }
+
+        .message.sent .message-content {
+            background: #95EC69;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.received .message-content {
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-image {
+            max-width: 250px;
+            max-height: 250px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* 通话遮罩优化移动端 */
+        .call-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 2500;
+            display: none;
+            flex-direction: column;
+        }
+
+        .call-overlay.active {
+            display: flex;
+        }
+
+        .remote-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+        }
+
+        .local-video-container {
+            position: absolute;
+            top: max(20px, env(safe-area-inset-top));
+            right: 20px;
+            width: 120px;
+            height: 160px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.3);
+            z-index: 10;
+        }
+
+        .local-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #333;
+        }
+
+        .call-controls {
+            position: absolute;
+            bottom: max(40px, env(safe-area-inset-bottom) + 20px);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 30px;
+            background: rgba(0,0,0,0.6);
+            padding: 20px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .call-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s;
+            color: white;
+        }
+
+        .call-btn.hangup {
+            background: #ff4d4f;
+        }
+
+        .call-btn.accept {
+            background: var(--primary-color);
+        }
+
+        .call-btn.mute {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .call-info {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            width: 100%;
+            padding: 20px;
+        }
+
+        /* 连接模态框优化 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 20px 20px 0 0;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding-bottom: env(safe-area-inset-bottom);
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        @media (min-width: 769px) {
+            .modal {
+                align-items: center;
+                padding: 20px;
+            }
+            .modal-content {
+                border-radius: 12px;
+                max-width: 600px;
+                max-height: 80vh;
+                animation: fadeIn 0.2s;
+            }
+        }
+
+        .modal-header {
+            padding: 20px;
+            background: #2e2e2e;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            background: #f5f5f5;
+            display: flex;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        textarea.modal-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+
+        .copy-section {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .copy-btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .encryption-toast {
+            position: fixed;
+            top: max(20px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(7, 193, 96, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 14px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            z-index: 3000;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+
+        .encryption-toast.show {
+            display: flex;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateX(-50%) translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* 步骤指示器简化 */
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+            gap: 20px;
+        }
+
+        .step {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .step.active {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 5px;
+            font-weight: bold;
+        }
+
+        .step.active .step-number {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 快速权限请求提示条 */
+        .permission-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff2f0;
+            border-top: 2px solid #ff4d4f;
+            padding: 16px 20px;
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+            z-index: 2000;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        }
+
+        .permission-bar.show {
+            transform: translateY(0);
+        }
+
+        .permission-bar-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .permission-bar-text {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .permission-bar-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- 移动端菜单按钮 -->
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+    
+    <!-- 遮罩层 -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="container">
+        <!-- 左侧栏 -->
+        <div class="sidebar" id="sidebar">
+            <div class="user-profile">
+                <div class="avatar" style="background: var(--primary-color);">我</div>
+                <div class="user-info">
+                    <h3>本地用户</h3>
+                    <div class="user-status">
+                        <span class="status-dot"></span>
+                        <span id="connectionStatus">等待连接</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="connection-panel">
+                <button class="conn-btn" onclick="startConnection()">
+                    <span>🚀</span> 创建连接
+                </button>
+                <button class="conn-btn secondary" onclick="joinConnection()">
+                    <span>🔗</span> 加入连接
+                </button>
+                <div class="security-badge">
+                    <span class="lock-icon">🔒</span>
+                    <span>端到端加密已就绪</span>
+                </div>
+            </div>
+
+            <div class="chat-list">
+                <div class="chat-item active">
+                    <div class="avatar" style="background: var(--primary-color);">友</div>
+                    <div class="chat-info">
+                        <div class="chat-name">P2P通信伙伴</div>
+                        <div class="chat-msg" id="lastMsg">点击按钮建立连接...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主聊天区 -->
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="chat-title">
+                    P2P通信伙伴
+                    <span id="connState" style="font-size: 12px; color: #999;">(未连接)</span>
+                </div>
+                <div class="chat-actions">
+                    <button class="icon-btn" onclick="checkAndStartCall('audio')" title="语音通话">📞</button>
+                    <button class="icon-btn" onclick="checkAndStartCall('video')" title="视频通话">📹</button>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messagesContainer">
+                <div class="system-message">欢迎使用安全P2P通信</div>
+                <div class="system-message">🔒 所有通信内容均通过WebRTC端到端加密</div>
+                <div class="system-message">👆 点击左上角菜单创建连接</div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-toolbar">
+                    <button class="tool-btn" title="发送图片">
+                        🖼️
+                        <input type="file" accept="image/*" onchange="sendImage(this)">
+                    </button>
+                    <button class="tool-btn" onclick="showPermissionGuide()" title="权限设置">
+                        ⚙️
+                    </button>
+                </div>
+                <div class="input-box">
+                    <textarea class="message-input" id="messageInput" placeholder="输入消息..." rows="1" oninput="autoResize(this)"></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 权限引导模态框 -->
+    <div class="permission-modal" id="permissionModal">
+        <div class="permission-content">
+            <div class="permission-header">
+                <div style="font-size: 48px;">📱</div>
+                <h3>需要摄像头和麦克风权限</h3>
+                <p style="font-size: 14px; opacity: 0.9;">为了进行音视频通话，请允许浏览器访问</p>
+            </div>
+            <div class="permission-body">
+                <div class="permission-item">
+                    <div class="permission-icon">📹</div>
+                    <div class="permission-text">
+                        <h4>摄像头权限</h4>
+                        <p>用于视频通话功能，让对方可以看到您。仅在通话期间使用。</p>
+                    </div>
+                </div>
+                <div class="permission-item">
+                    <div class="permission-icon">🎤</div>
+                    <div class="permission-text">
+                        <h4>麦克风权限</h4>
+                        <p>用于语音通话功能，让对方可以听到您的声音。仅在通话期间使用。</p>
+                    </div>
+                </div>
+
+                <div class="permission-steps">
+                    <h5>Edge浏览器开启权限步骤：</h5>
+                    <ol>
+                        <li>点击Edge浏览器地址栏左侧的<strong>🔒 锁形图标</strong></li>
+                        <li>找到"摄像头"和"麦克风"选项</li>
+                        <li>将权限设置为<strong>"允许"</strong></li>
+                        <li>如果没有看到选项，点击"站点权限"</li>
+                        <li>刷新页面后重试</li>
+                    </ol>
+                </div>
+
+                <button class="permission-btn" onclick="requestPermissions()">
+                    尝试重新获取权限
+                </button>
+                <button class="permission-btn secondary" onclick="closePermissionModal()">
+                    暂时不需要
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部权限提示条 -->
+    <div class="permission-bar" id="permissionBar">
+        <div class="permission-bar-content">
+            <div class="permission-bar-text">
+                <strong>需要权限</strong><br>
+                <span style="font-size: 12px; color: #666;">点击允许摄像头和麦克风访问以进行通话</span>
+            </div>
+            <button class="permission-bar-btn" onclick="requestPermissions()">
+                允许访问
+            </button>
+        </div>
+    </div>
+
+    <!-- 通话界面 -->
+    <div class="call-overlay" id="callOverlay">
+        <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
+        <div class="local-video-container">
+            <video class="local-video" id="localVideo" autoplay playsinline muted></video>
+        </div>
+        <div class="call-info" id="callInfo">
+            <div style="font-size: 20px; margin-bottom: 10px;">P2P通信伙伴</div>
+            <div id="callStatus">正在呼叫...</div>
+            <div id="callTimer" style="margin-top: 10px; font-size: 18px; display: none;">00:00</div>
+        </div>
+        <div class="call-controls">
+            <button class="call-btn mute" onclick="toggleMute()" id="muteBtn">🎤</button>
+            <button class="call-btn hangup" onclick="endCall()">📞</button>
+        </div>
+    </div>
+
+    <!-- 连接设置模态框 -->
+    <div class="modal" id="connectionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">建立P2P连接</h3>
+                <button onclick="closeModal()" style="background:none;border:none;color:white;font-size:20px;">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 15px;">
+                <div class="step-indicator">
+                    <div class="step active" id="step1Ind">
+                        <div class="step-number">1</div>
+                        <div>交换代码</div>
+                    </div>
+                    <div class="step" id="step2Ind">
+                        <div class="step-number">2</div>
+                        <div>完成</div>
+                    </div>
+                </div>
+
+                <!-- 发起方 -->
+                <div id="initiatorFlow">
+                    <div id="step1-initiator">
+                        <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                            生成您的连接码，复制后发送给对方。
+                        </p>
+                        <textarea class="modal-input" id="localSDP" readonly placeholder="点击生成..."></textarea>
+                        <div class="copy-section">
+                            <button class="copy-btn" onclick="generateAndCopy()">生成并复制</button>
+                            <button class="copy-btn" onclick="nextStep()" style="background: #4a4a4a;">下一步</button>
+                        </div>
+                    </div>
+                    <div id="step2-initiator" class="hidden">
+                        <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                            粘贴对方的响应码：
+                        </p>
+                        <textarea class="modal-input" id="remoteSDP" placeholder="在此粘贴..."></textarea>
+                        <button class="btn btn-primary" onclick="completeConnection()" style="width: 100%; margin-top: 10px;">
+                            完成连接
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 接收方 -->
+                <div id="receiverFlow" class="hidden">
+                    <div id="step1-receiver">
+                        <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                            粘贴对方的连接码：
+                        </p>
+                        <textarea class="modal-input" id="receiverRemoteSDP" placeholder="在此粘贴..."></textarea>
+                        <button class="btn btn-primary" onclick="processOffer()" style="width: 100%; margin-top: 10px;">
+                            生成响应码
+                        </button>
+                    </div>
+                    <div id="step2-receiver" class="hidden">
+                        <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                            复制下方响应码发给对方：
+                        </p>
+                        <textarea class="modal-input" id="localAnswer" readonly></textarea>
+                        <div class="copy-section">
+                            <button class="copy-btn" onclick="copyCode('localAnswer')">复制响应码</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="step-success" class="hidden" style="text-align: center; padding: 30px;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">✅</div>
+                    <h3 style="color: var(--primary-color); margin-bottom: 10px;">连接成功！</h3>
+                    <p style="color: #666; font-size: 14px;">可以开始安全通信了</p>
+                    <button class="btn btn-primary" onclick="closeModal()" style="margin-top: 20px; width: 100%;">
+                        开始聊天
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示 -->
+    <div class="encryption-toast" id="encryptionToast">
+        <span>🔒</span>
+        <span>加密连接已建立</span>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 全局变量
+        let pc = null;
+        let dataChannel = null;
+        let localStream = null;
+        let remoteStream = null;
+        let isInitiator = false;
+        let currentCall = null;
+        let hasPermission = false;
+        let mediaRetryCount = 0;
+
+        const iceServers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // 初始化
+        function init() {
+            // 检测权限状态
+            checkPermissions();
+            
+            // 监听屏幕旋转
+            window.addEventListener('orientationchange', () => {
+                setTimeout(() => {
+                    document.body.style.height = window.innerHeight + 'px';
+                }, 100);
+            });
+            
+            // 处理键盘弹出（iOS/Android）
+            const input = document.getElementById('messageInput');
+            input.addEventListener('focus', () => {
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
+        }
+
+        // 检查权限
+        async function checkPermissions() {
+            try {
+                if (navigator.permissions) {
+                    const camResult = await navigator.permissions.query({ name: 'camera' });
+                    const micResult = await navigator.permissions.query({ name: 'microphone' });
+                    
+                    if (camResult.state === 'granted' && micResult.state === 'granted') {
+                        hasPermission = true;
+                    } else if (camResult.state === 'prompt' || micResult.state === 'prompt') {
+                        // 显示权限提示条
+                        document.getElementById('permissionBar').classList.add('show');
+                    }
+                }
+            } catch (e) {
+                console.log('权限检查不支持');
+            }
+        }
+
+        // 请求权限
+        async function requestPermissions() {
+            try {
+                // 移动端必须先尝试获取流才能触发权限请求
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                
+                // 立即停止，只是测试权限
+                stream.getTracks().forEach(track => track.stop());
+                
+                hasPermission = true;
+                document.getElementById('permissionBar').classList.remove('show');
+                document.getElementById('permissionModal').classList.remove('active');
+                showToast('权限获取成功！');
+                
+            } catch (err) {
+                console.error('权限获取失败:', err);
+                showToast('请手动在浏览器设置中开启权限');
+                showPermissionGuide();
+            }
+        }
+
+        // 显示权限引导
+        function showPermissionGuide() {
+            document.getElementById('permissionModal').classList.add('active');
+        }
+
+        function closePermissionModal() {
+            document.getElementById('permissionModal').classList.remove('active');
+        }
+
+        // 检查并启动通话
+        async function checkAndStartCall(type) {
+            if (!dataChannel || dataChannel.readyState !== 'open') {
+                showToast('请先建立连接');
+                return;
+            }
+
+            if (!hasPermission) {
+                showPermissionGuide();
+                return;
+            }
+
+            if (type === 'video') {
+                startVideoCall();
+            } else {
+                startVoiceCall();
+            }
+        }
+
+        // 移动端侧边栏切换
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            sidebar.classList.toggle('active');
+            
+            if (sidebar.classList.contains('active')) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        // 自动调整输入框高度
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+        }
+
+        // WebRTC功能（简化版，保持核心逻辑）
+        function createPeerConnection() {
+            pc = new RTCPeerConnection(iceServers);
+            
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('ICE候选:', event.candidate);
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'connected') {
+                    updateConnectionStatus('已连接', 'connected');
+                    document.getElementById('connState').textContent = '(已加密)';
+                    document.getElementById('connState').style.color = 'var(--primary-color)';
+                    document.getElementById('encryptionToast').classList.add('show');
+                    setTimeout(() => document.getElementById('encryptionToast').classList.remove('show'), 3000);
+                }
+            };
+
+            pc.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                setupDataChannel(dataChannel);
+            };
+
+            pc.ontrack = (event) => {
+                remoteStream = event.streams[0];
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+            };
+
+            return pc;
+        }
+
+        async function startConnection() {
+            isInitiator = true;
+            document.getElementById('modalTitle').textContent = '创建连接';
+            document.getElementById('initiatorFlow').classList.remove('hidden');
+            document.getElementById('receiverFlow').classList.add('hidden');
+            resetModal();
+            document.getElementById('connectionModal').classList.add('active');
+            toggleSidebar(); // 关闭侧边栏
+        }
+
+        async function joinConnection() {
+            isInitiator = false;
+            document.getElementById('modalTitle').textContent = '加入连接';
+            document.getElementById('initiatorFlow').classList.add('hidden');
+            document.getElementById('receiverFlow').classList.remove('hidden');
+            resetModal();
+            document.getElementById('connectionModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        function resetModal() {
+            document.getElementById('step1-initiator').classList.remove('hidden');
+            document.getElementById('step2-initiator').classList.add('hidden');
+            document.getElementById('step1-receiver').classList.remove('hidden');
+            document.getElementById('step2-receiver').classList.add('hidden');
+            document.getElementById('step-success').classList.add('hidden');
+            
+            document.getElementById('localSDP').value = '';
+            document.getElementById('remoteSDP').value = '';
+            document.getElementById('receiverRemoteSDP').value = '';
+            document.getElementById('localAnswer').value = '';
+            
+            updateStepIndicator(1);
+        }
+
+        function updateStepIndicator(step) {
+            document.getElementById('step1Ind').classList.toggle('active', step === 1);
+            document.getElementById('step2Ind').classList.toggle('active', step === 2);
+        }
+
+        async function generateAndCopy() {
+            createPeerConnection();
+            dataChannel = pc.createDataChannel('messages', { ordered: true });
+            setupDataChannel(dataChannel);
+
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                await waitForIceComplete();
+                
+                const sdp = btoa(JSON.stringify(pc.localDescription));
+                document.getElementById('localSDP').value = sdp;
+                
+                // 复制到剪贴板
+                try {
+                    await navigator.clipboard.writeText(sdp);
+                    showToast('已复制到剪贴板！');
+                } catch (e) {
+                    // 降级方案
+                    const el = document.getElementById('localSDP');
+                    el.select();
+                    document.execCommand('copy');
+                    showToast('已复制！请立即发送给对方');
+                }
+                
+            } catch (err) {
+                showToast('生成失败: ' + err.message);
+            }
+        }
+
+        function nextStep() {
+            if (!document.getElementById('localSDP').value) {
+                showToast('请先生成连接码');
+                return;
+            }
+            document.getElementById('step1-initiator').classList.add('hidden');
+            document.getElementById('step2-initiator').classList.remove('hidden');
+            updateStepIndicator(2);
+        }
+
+        async function processOffer() {
+            const remoteSDP = document.getElementById('receiverRemoteSDP').value.trim();
+            if (!remoteSDP) return showToast('请输入连接码');
+
+            try {
+                createPeerConnection();
+                pc.ondatachannel = (e) => {
+                    dataChannel = e.channel;
+                    setupDataChannel(dataChannel);
+                };
+
+                const desc = JSON.parse(atob(remoteSDP));
+                await pc.setRemoteDescription(desc);
+                
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                await waitForIceComplete();
+                
+                const sdp = btoa(JSON.stringify(pc.localDescription));
+                document.getElementById('localAnswer').value = sdp;
+                
+                document.getElementById('step1-receiver').classList.add('hidden');
+                document.getElementById('step2-receiver').classList.remove('hidden');
+                updateStepIndicator(2);
+                
+                // 自动复制
+                setTimeout(() => {
+                    try {
+                        navigator.clipboard.writeText(sdp);
+                        showToast('响应码已复制！请发给对方');
+                    } catch(e) {
+                        showToast('请手动复制响应码发给对方');
+                    }
+                }, 500);
+                
+            } catch (err) {
+                showToast('无效连接码');
+            }
+        }
+
+        async function completeConnection() {
+            const remoteSDP = document.getElementById('remoteSDP').value.trim();
+            if (!remoteSDP) return showToast('请输入响应码');
+
+            try {
+                const desc = JSON.parse(atob(remoteSDP));
+                await pc.setRemoteDescription(desc);
+                
+                document.getElementById('step2-initiator').classList.add('hidden');
+                document.getElementById('step-success').classList.remove('hidden');
+                updateStepIndicator(2);
+                
+            } catch (err) {
+                showToast('无效响应码');
+            }
+        }
+
+        function setupDataChannel(channel) {
+            channel.onopen = () => {
+                document.getElementById('sendBtn').disabled = false;
+                addMessage('系统', '已连接，可以开始聊天', 'system');
+                if (!isInitiator) {
+                    setTimeout(closeModal, 1000);
+                }
+            };
+            channel.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === 'text') {
+                    addMessage('对方', data.content, 'received');
+                } else if (data.type === 'image') {
+                    addImageMessage('对方', data.content, 'received');
+                }
+            };
+        }
+
+        async function waitForIceComplete() {
+            return new Promise(resolve => {
+                if (pc.iceGatheringState === 'complete') return resolve();
+                pc.addEventListener('icegatheringstatechange', function check() {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', check);
+                        resolve();
+                    }
+                });
+                setTimeout(resolve, 2000);
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text || !dataChannel) return;
+
+            dataChannel.send(JSON.stringify({type: 'text', content: text}));
+            addMessage('我', text, 'sent');
+            input.value = '';
+            input.style.height = 'auto';
+        }
+
+        function sendImage(input) {
+            const file = input.files[0];
+            if (!file || !dataChannel) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                dataChannel.send(JSON.stringify({type: 'image', content: e.target.result}));
+                addImageMessage('我', e.target.result, 'sent');
+            };
+            reader.readAsDataURL(file);
+            input.value = '';
+        }
+
+        function addMessage(sender, text, type) {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            
+            const time = new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
+            
+            div.innerHTML = `
+                <div class="message-avatar">${sender === '我' ? '我' : '友'}</div>
+                <div class="message-content">
+                    <div>${text}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addImageMessage(sender, src, type) {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            
+            const time = new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
+            
+            div.innerHTML = `
+                <div class="message-avatar">${sender === '我' ? '我' : '友'}</div>
+                <div class="message-content">
+                    <img src="${src}" class="message-image" onclick="window.open(this.src)">
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function startVideoCall() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                setupCall(true);
+            } catch (err) {
+                handleMediaError(err);
+            }
+        }
+
+        async function startVoiceCall() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                setupCall(true, true);
+            } catch (err) {
+                handleMediaError(err);
+            }
+        }
+
+        function setupCall(isOutgoing, isAudio = false) {
+            document.getElementById('localVideo').srcObject = localStream;
+            
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+            
+            document.getElementById('callOverlay').classList.add('active');
+            document.getElementById('callStatus').textContent = isOutgoing ? '正在呼叫...' : '通话中';
+            
+            // 发送通话信令（简化）
+            if (dataChannel && dataChannel.readyState === 'open') {
+                pc.createOffer().then(offer => {
+                    pc.setLocalDescription(offer);
+                    dataChannel.send(JSON.stringify({
+                        type: 'call-offer',
+                        sdp: offer,
+                        callType: isAudio ? 'audio' : 'video'
+                    }));
+                });
+            }
+        }
+
+        function handleMediaError(err) {
+            console.error('媒体错误:', err);
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                showPermissionGuide();
+                showToast('请允许摄像头和麦克风权限');
+            } else if (err.name === 'NotFoundError') {
+                showToast('未找到摄像头或麦克风设备');
+            } else {
+                showToast('无法启动通话: ' + err.message);
+            }
+        }
+
+        function endCall() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            document.getElementById('callOverlay').classList.remove('active');
+            if (dataChannel) {
+                dataChannel.send(JSON.stringify({ type: 'call-end' }));
+            }
+        }
+
+        function toggleMute() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    document.getElementById('muteBtn').textContent = audioTrack.enabled ? '🎤' : '🎤❌';
+                }
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('connectionModal').classList.remove('active');
+        }
+
+        function copyCode(id) {
+            const el = document.getElementById(id);
+            el.select();
+            try {
+                document.execCommand('copy');
+                showToast('已复制！');
+            } catch(e) {
+                showToast('请手动长按复制');
+            }
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function updateConnectionStatus(text, state) {
+            document.getElementById('connectionStatus').textContent = text;
+            document.querySelector('.status-dot').style.background = state === 'connected' ? 'var(--primary-color)' : '#999';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>
