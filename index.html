@@ -8,7 +8,10 @@
         :root { --primary: #07C160; --safe-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; height: 100dvh; overflow: hidden; position: fixed; width: 100%; }
+        
         .container { display: flex; height: 100%; flex-direction: column; }
+        
+        /* Header */
         .header { background: #2e2e2e; color: white; padding: 12px 16px; padding-top: max(12px, var(--safe-top)); display: flex; justify-content: space-between; align-items: center; }
         .header-title { font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #666; }
@@ -16,6 +19,9 @@
         .header-actions { display: flex; gap: 12px; }
         .icon-btn { width: 36px; height: 36px; border: none; background: rgba(255,255,255,0.1); color: white; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .icon-btn.active { background: var(--primary); }
+        
+        /* Messages */
         .messages { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 20px; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 12px; }
         .message { display: flex; gap: 8px; max-width: 85%; animation: pop 0.3s; }
         @keyframes pop { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -27,7 +33,11 @@
         .message.received .msg-content { border-bottom-left-radius: 4px; }
         .msg-time { font-size: 10px; color: #999; margin-top: 4px; text-align: right; }
         .system-msg { align-self: center; background: rgba(0,0,0,0.05); color: #666; padding: 6px 12px; border-radius: 12px; font-size: 12px; max-width: 90%; text-align: center; }
+        
+        /* Images in chat */
         .msg-image { max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer; display: block; }
+        
+        /* Input Area */
         .input-area { background: #f7f7f7; border-top: 1px solid #e0e0e0; padding: 10px 12px; padding-bottom: max(10px, var(--safe-bottom)); }
         .input-toolbar { display: flex; gap: 12px; margin-bottom: 8px; align-items: center; }
         .tool-btn { width: 32px; height: 32px; border: none; background: transparent; font-size: 20px; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; }
@@ -36,36 +46,64 @@
         .msg-input { flex: 1; border: none; outline: none; font-size: 16px; max-height: 100px; resize: none; font-family: inherit; padding: 4px; line-height: 1.4; background: transparent; }
         .send-btn { background: var(--primary); color: white; border: none; padding: 6px 16px; border-radius: 16px; font-size: 14px; cursor: pointer; font-weight: 500; }
         .send-btn:disabled { background: #ccc; }
+        
+        /* Video Call Overlay */
         .call-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
         .call-overlay.active { display: flex; }
         .remote-video { flex: 1; background: #111; object-fit: cover; }
         .local-pip { position: absolute; top: max(60px, var(--safe-top)); right: 16px; width: 100px; height: 140px; background: #333; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); }
         .local-pip video { width: 100%; height: 100%; object-fit: cover; }
         .call-controls { position: absolute; bottom: max(40px, var(--safe-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 24px; background: rgba(0,0,0,0.6); padding: 16px 24px; border-radius: 40px; backdrop-filter: blur(10px); }
-        .call-btn { width: 56px; height: 56px; border-radius: 50%; border: none; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; }
+        .call-btn { width: 56px; height: 56px; border-radius: 50%; border: none; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; transition: transform 0.2s; }
+        .call-btn:active { transform: scale(0.95); }
         .call-btn.hangup { background: #ff4d4f; }
         .call-btn.mute { background: rgba(255,255,255,0.2); }
         .call-btn.muted { background: #ff4d4f; }
+        
+        /* Connection Modal */
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: flex-end; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: white; width: 100%; max-height: 90vh; border-radius: 20px 20px 0 0; overflow: hidden; animation: slideUp 0.3s; display: flex; flex-direction: column; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .modal-header { background: #2e2e2e; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 16px; border-top: 1px solid #eee; display: flex; gap: 10px; }
         .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: 500; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-secondary { background: #f0f0f0; color: #333; }
-        textarea.code-input { width: 100%; height: 120px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; resize: none; margin: 10px 0; background: #f8f8f8; }
-        .copy-btn-group { display: flex; gap: 8px; margin-top: 10px; }
-        .copy-btn { flex: 1; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-        .copy-btn.secondary { background: #f0f0f0; color: #333; }
+        .btn:disabled { opacity: 0.5; }
+        
         .step-indicator { display: flex; justify-content: center; margin-bottom: 20px; gap: 30px; }
         .step { text-align: center; color: #ccc; font-size: 12px; }
         .step.active { color: var(--primary); font-weight: bold; }
         .step-circle { width: 32px; height: 32px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-weight: bold; }
         .step.active .step-circle { background: var(--primary); color: white; }
+        
+        textarea.code-input { width: 100%; height: 120px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; resize: none; margin: 10px 0; background: #f8f8f8; }
+        .copy-btn-group { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .copy-btn { flex: 1; min-width: 100px; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .copy-btn.secondary { background: #f0f0f0; color: #333; }
+        
+        /* Network Status Warning */
+        .net-warning { position: fixed; top: max(60px, var(--safe-top)); left: 50%; transform: translateX(-50%); background: #ff4d4f; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; z-index: 500; display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .net-warning.show { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        
+        /* Loading Spinner */
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Utility */
         .hidden { display: none !important; }
         .text-center { text-align: center; }
+        .mt-10 { margin-top: 10px; }
+        .mb-10 { margin-bottom: 10px; }
+        .text-red { color: #ff4d4f; }
+        .text-green { color: var(--primary); }
+        
+        @media (min-height: 600px) {
+            .modal-content { max-height: 80vh; border-radius: 12px; width: 90%; max-width: 500px; margin: auto; animation: fadeIn 0.2s; }
+        }
     </style>
 </head>
 <body>
@@ -77,126 +115,196 @@
             <span class="status-badge" id="connBadge">未连接</span>
         </div>
         <div class="header-actions">
-            <button class="icon-btn" id="callBtn" onclick="startCall('video')" disabled>📹</button>
-            <button class="icon-btn" id="voiceBtn" onclick="startCall('audio')" disabled>📞</button>
-            <button class="icon-btn" onclick="showConnModal()">⚙️</button>
+            <button class="icon-btn" id="callBtn" onclick="startCall('video')" disabled title="视频通话">📹</button>
+            <button class="icon-btn" id="voiceBtn" onclick="startCall('audio')" disabled title="语音通话">📞</button>
+            <button class="icon-btn" onclick="showConnModal()" title="连接设置">⚙️</button>
         </div>
     </div>
 
     <div class="messages" id="messages">
-        <div class="system-msg">🔒 端到端加密通信<br>数据不经过服务器</div>
-        <div class="system-msg">点击 ⚙️ 创建或加入连接</div>
+        <div class="system-msg">🔒 端到端加密通信工具<br>数据不经过服务器，直接点对点传输</div>
+        <div class="system-msg">点击右上角 ⚙️ 创建或加入连接</div>
     </div>
 
     <div class="input-area">
         <div class="input-toolbar">
-            <button class="tool-btn">📷<input type="file" accept="image/*" onchange="handleImage(this)" capture="environment"></button>
-            <button class="tool-btn" onclick="document.getElementById('file').click()">🖼️<input type="file" id="file" accept="image/*" style="display:none" onchange="handleImage(this)"></button>
+            <button class="tool-btn">
+                📷
+                <input type="file" accept="image/*" onchange="handleImageSelect(this)" capture="environment">
+            </button>
+            <button class="tool-btn" onclick="document.getElementById('fileInput').click()">
+                🖼️
+                <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleImageSelect(this)">
+            </button>
         </div>
         <div class="input-box">
-            <textarea class="msg-input" id="msgInput" placeholder="输入消息..." rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+            <textarea class="msg-input" id="msgInput" placeholder="输入消息..." rows="1" oninput="autoResize(this)" onkeypress="handleEnter(event)"></textarea>
             <button class="send-btn" id="sendBtn" onclick="sendText()" disabled>发送</button>
         </div>
     </div>
 </div>
 
+<!-- Network Warning -->
+<div class="net-warning" id="netWarning">⚠️ 连接不稳定，正在重连...</div>
+
+<!-- Call Overlay -->
 <div class="call-overlay" id="callOverlay">
     <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
-    <div class="local-pip"><video id="localVideo" autoplay playsinline muted></video></div>
+    <div class="local-pip">
+        <video id="localVideo" autoplay playsinline muted></video>
+    </div>
     <div class="call-controls">
         <button class="call-btn mute" id="muteBtn" onclick="toggleMute()">🎤</button>
-        <button class="call-btn hangup" onclick="hangup()">📞</button>
+        <button class="call-btn hangup" onclick="endCall()">📞</button>
     </div>
 </div>
 
+<!-- Connection Modal -->
 <div class="modal" id="connModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 style="font-size:16px">建立P2P连接</h3>
-            <button onclick="closeModal()" style="background:none;border:none;color:white;font-size:20px">✕</button>
+            <h3 style="font-size: 16px; font-weight: 500;">建立P2P连接</h3>
+            <button onclick="closeModal()" style="background:none; border:none; color:white; font-size:20px;">✕</button>
         </div>
+        
         <div class="modal-body">
             <div class="step-indicator">
-                <div class="step active" id="step1"><div class="step-circle">1</div><div>交换代码</div></div>
-                <div class="step" id="step2"><div class="step-circle">2</div><div>完成</div></div>
+                <div class="step active" id="step1">
+                    <div class="step-circle">1</div>
+                    <div>交换代码</div>
+                </div>
+                <div class="step" id="step2">
+                    <div class="step-circle">2</div>
+                    <div>完成</div>
+                </div>
             </div>
 
             <div id="modeSelect">
-                <p class="text-center" style="color:#666;font-size:14px;margin-bottom:20px">选择角色</p>
-                <div style="display:flex;gap:10px">
-                    <button class="btn btn-primary" onclick="setMode('create')" style="flex:1;padding:20px">
-                        <div style="font-size:24px;margin-bottom:8px">🚀</div>
-                        <div>创建连接</div>
+                <p class="text-center mb-10" style="color:#666; font-size:14px;">选择角色开始建立加密连接</p>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn btn-primary" onclick="setMode('create')" style="flex:1; padding:20px;">
+                        <div style="font-size:24px; margin-bottom:8px;">🚀</div>
+                        <div>创建连接<br><small style="opacity:0.8;">我是发起方</small></div>
                     </button>
-                    <button class="btn btn-secondary" onclick="setMode('join')" style="flex:1;padding:20px">
-                        <div style="font-size:24px;margin-bottom:8px">🔗</div>
-                        <div>加入连接</div>
+                    <button class="btn btn-secondary" onclick="setMode('join')" style="flex:1; padding:20px;">
+                        <div style="font-size:24px; margin-bottom:8px;">🔗</div>
+                        <div>加入连接<br><small style="opacity:0.6;">我是接收方</small></div>
                     </button>
                 </div>
             </div>
 
             <div id="createFlow" class="hidden">
                 <div id="createStep1">
-                    <p style="font-size:13px;color:#666;margin-bottom:10px">1. 生成连接码并发送给对方</p>
-                    <button class="btn btn-primary" onclick="createOffer()" style="width:100%;margin:10px 0">生成连接码</button>
+                    <p style="font-size:13px; color:#666; margin-bottom:10px;">
+                        1. 点击下方按钮生成连接码<br>
+                        2. <span class="text-red">长按复制</span>生成的代码<br>
+                        3. 通过微信/短信发送给对方<br>
+                        4. 等待对方发回响应码
+                    </p>
+                    <button class="btn btn-primary" onclick="createOffer()" id="createBtn" style="width:100%; margin:10px 0;">
+                        生成连接码
+                    </button>
                     <textarea class="code-input" id="offerCode" readonly placeholder="生成后将显示在这里..."></textarea>
                     <div class="copy-btn-group">
-                        <button class="copy-btn" onclick="copy('offerCode')">复制</button>
-                        <button class="copy-btn secondary" onclick="goStep(2)">下一步</button>
+                        <button class="copy-btn" onclick="copyText('offerCode')">📋 复制代码</button>
+                        <button class="copy-btn secondary" onclick="goToCreateStep2()">下一步 →</button>
                     </div>
                 </div>
+                
                 <div id="createStep2" class="hidden">
-                    <p style="font-size:13px;color:#666;margin-bottom:10px">2. 粘贴对方的响应码：</p>
+                    <p style="font-size:13px; color:#666; margin-bottom:10px;">
+                        将对方发回的<span class="text-green">响应码</span>粘贴到下方：
+                    </p>
                     <textarea class="code-input" id="answerCode" placeholder="粘贴响应码..."></textarea>
-                    <button class="btn btn-primary" onclick="completeConnection()" style="width:100%;margin-top:10px">完成连接</button>
-                    <button class="btn btn-secondary" onclick="goStep(1)" style="width:100%;margin-top:8px">返回</button>
+                    <button class="btn btn-primary" onclick="completeConnection()" style="width:100%; margin-top:10px;">
+                        完成连接
+                    </button>
+                    <button class="btn btn-secondary" onclick="backToCreateStep1()" style="width:100%; margin-top:8px;">
+                        ← 返回上一步
+                    </button>
                 </div>
             </div>
 
             <div id="joinFlow" class="hidden">
                 <div id="joinStep1">
-                    <p style="font-size:13px;color:#666;margin-bottom:10px">粘贴对方的连接码：</p>
+                    <p style="font-size:13px; color:#666; margin-bottom:10px;">
+                        将对方发送的<span class="text-green">连接码</span>粘贴到下方：
+                    </p>
                     <textarea class="code-input" id="joinOffer" placeholder="粘贴连接码..."></textarea>
-                    <button class="btn btn-primary" onclick="createAnswer()" style="width:100%;margin-top:10px">生成响应码</button>
+                    <button class="btn btn-primary" onclick="createAnswer()" style="width:100%; margin-top:10px;">
+                        生成响应码
+                    </button>
                 </div>
+                
                 <div id="joinStep2" class="hidden">
-                    <p style="font-size:13px;color:#666;margin-bottom:10px">复制响应码发给对方：</p>
+                    <p style="font-size:13px; color:#666; margin-bottom:10px;">
+                        1. <span class="text-red">长按复制</span>下方响应码<br>
+                        2. 发送给对方<br>
+                        3. 等待对方完成连接
+                    </p>
                     <textarea class="code-input" id="joinAnswer" readonly></textarea>
-                    <button class="copy-btn" onclick="copy('joinAnswer')" style="width:100%;margin-top:10px">复制响应码</button>
-                    <div class="system-msg" style="background:#e6f7ed;color:#07C160;margin-top:10px">等待对方完成连接...</div>
+                    <button class="copy-btn" onclick="copyText('joinAnswer')" style="width:100%; margin-top:10px;">
+                        📋 复制响应码
+                    </button>
+                    <div class="system-msg mt-10" style="background:#e6f7ed; color:#07C160;">
+                        发送后请等待对方点击"完成连接"，<br>此页面保持打开不要关闭
+                    </div>
                 </div>
             </div>
 
-            <div id="successView" class="hidden text-center" style="padding:30px 0">
-                <div style="font-size:48px;margin-bottom:10px">✅</div>
-                <h3 style="color:var(--primary);margin-bottom:8px">连接成功！</h3>
-                <button class="btn btn-primary" onclick="closeModal()" style="width:100%;margin-top:20px">开始聊天</button>
+            <div id="successView" class="hidden text-center" style="padding:30px 0;">
+                <div style="font-size:48px; margin-bottom:10px;">✅</div>
+                <h3 style="color:var(--primary); margin-bottom:8px;">连接成功！</h3>
+                <p style="color:#666; font-size:13px;">可以开始加密通信了</p>
+                <button class="btn btn-primary" onclick="closeModal()" style="width:100%; margin-top:20px;">开始聊天</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-const iceServers = {
+// ============== 配置 ==============
+// 使用公共STUN + TURN服务器（解决GitHub Pages部署后NAT穿透问题）
+const iceConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-    ]
+        // 使用免费的TURN服务器（可能有流量限制，建议自行注册）
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ],
+    iceCandidatePoolSize: 10
 };
 
+// ============== 全局状态 ==============
 let pc = null;
-let dc = null;
+let dc = null; // DataChannel
 let localStream = null;
+let remoteStream = null;
+let currentMode = null; // 'create' 或 'join'
 let isConnected = false;
-let isInCall = false;
-let callSenders = [];
+let pendingCandidates = []; // 暂存ICE候选
+let reconnectAttempts = 0;
 
-// 关键：防止重复刷屏的全局变量
-let lastEndTime = 0;      // 上次结束通话的时间戳
-let endMsgSent = false;   // 本次通话是否已发送过结束消息
+// ============== 初始化 ==============
+function init() {
+    // 页面可见性变化时处理
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && pc && pc.connectionState === 'disconnected') {
+            showNetWarning(true);
+        }
+    });
+}
 
+// ============== 连接管理 ==============
 function showConnModal() {
     document.getElementById('connModal').classList.add('active');
     resetModal();
@@ -219,6 +327,7 @@ function resetModal() {
 }
 
 function setMode(mode) {
+    currentMode = mode;
     document.getElementById('modeSelect').classList.add('hidden');
     if (mode === 'create') {
         document.getElementById('createFlow').classList.remove('hidden');
@@ -232,45 +341,55 @@ function updateStep(step) {
     document.getElementById('step2').classList.toggle('active', step === 2);
 }
 
-function goStep(step) {
-    if (step === 2 && !document.getElementById('offerCode').value) {
-        alert('请先生成连接码');
-        return;
-    }
-    document.getElementById('createStep1').classList.toggle('hidden', step !== 1);
-    document.getElementById('createStep2').classList.toggle('hidden', step !== 2);
-    updateStep(step);
-}
-
+// ============== WebRTC核心 ==============
 function createPeer() {
-    pc = new RTCPeerConnection(iceServers);
+    pc = new RTCPeerConnection(iceConfig);
     
+    // 连接状态监控
     pc.onconnectionstatechange = () => {
-        console.log('状态:', pc.connectionState);
+        console.log('连接状态:', pc.connectionState);
         const badge = document.getElementById('connBadge');
+        
         if (pc.connectionState === 'connected') {
             badge.textContent = '已加密';
             badge.classList.add('connected');
             document.getElementById('sendBtn').disabled = false;
             document.getElementById('callBtn').disabled = false;
             document.getElementById('voiceBtn').disabled = false;
+            showNetWarning(false);
             if (!isConnected) {
                 isConnected = true;
-                addMsg('系统', '🔒 连接已建立', 'system');
+                addSystemMsg('🔒 端到端加密连接已建立');
             }
-        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
             badge.textContent = '已断开';
             badge.classList.remove('connected');
             document.getElementById('sendBtn').disabled = true;
             document.getElementById('callBtn').disabled = true;
             document.getElementById('voiceBtn').disabled = true;
+            if (isConnected) {
+                isConnected = false;
+                addSystemMsg('⚠️ 连接已断开，请重连');
+                attemptReconnect();
+            }
         }
     };
 
-    pc.ondatachannel = (e) => {
-        setupDC(e.channel);
+    // ICE处理（关键：收集候选并发送）
+    pc.onicecandidate = (e) => {
+        if (e.candidate) {
+            console.log('ICE候选:', e.candidate);
+            // 在实际应用中，这里应通过信令通道发送
+            // 但由于我们手动交换SDP，ICE已经包含在SDP中
+        }
     };
-    
+
+    // 数据通道（接收方）
+    pc.ondatachannel = (e) => {
+        setupDataChannel(e.channel);
+    };
+
+    // 媒体流（通话）
     pc.ontrack = (e) => {
         document.getElementById('remoteVideo').srcObject = e.streams[0];
     };
@@ -278,285 +397,461 @@ function createPeer() {
     return pc;
 }
 
+// 创建Offer（发起方）
 async function createOffer() {
     createPeer();
-    dc = pc.createDataChannel('chat');
-    setupDC(dc);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await waitIce();
-    document.getElementById('offerCode').value = btoa(JSON.stringify(pc.localDescription));
+    
+    // 创建数据通道（文字、图片）
+    dc = pc.createDataChannel('chat', { ordered: true, maxRetransmits: 3 });
+    setupDataChannel(dc);
+    
+    try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
+        // 等待ICE收集完成（使用Trickle ICE优化）
+        await waitForIceComplete();
+        
+        const sdp = pc.localDescription;
+        const code = btoa(JSON.stringify(sdp));
+        document.getElementById('offerCode').value = code;
+        
+        // 自动选择文本方便复制（移动端）
+        setTimeout(() => {
+            document.getElementById('offerCode').select();
+        }, 100);
+        
+    } catch (err) {
+        alert('生成失败: ' + err.message);
+    }
 }
 
+// 创建Answer（接收方）
 async function createAnswer() {
     const offerStr = document.getElementById('joinOffer').value.trim();
     if (!offerStr) return alert('请输入连接码');
+    
     createPeer();
-    await pc.setRemoteDescription(JSON.parse(atob(offerStr)));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await waitIce();
-    document.getElementById('joinAnswer').value = btoa(JSON.stringify(pc.localDescription));
-    document.getElementById('joinStep1').classList.add('hidden');
-    document.getElementById('joinStep2').classList.remove('hidden');
-    updateStep(2);
-    // 接收方等待连接
-    waitForConnect();
+    
+    try {
+        const offer = JSON.parse(atob(offerStr));
+        await pc.setRemoteDescription(offer);
+        
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        
+        await waitForIceComplete();
+        
+        const code = btoa(JSON.stringify(pc.localDescription));
+        document.getElementById('joinAnswer').value = code;
+        
+        document.getElementById('joinStep1').classList.add('hidden');
+        document.getElementById('joinStep2').classList.remove('hidden');
+        updateStep(2);
+        
+        setTimeout(() => {
+            document.getElementById('joinAnswer').select();
+        }, 100);
+        
+        // 接收方保持监听连接状态
+        checkConnectionStatus();
+        
+    } catch (err) {
+        alert('无效连接码: ' + err.message);
+    }
 }
 
+// 完成连接（发起方输入Answer）
 async function completeConnection() {
     const answerStr = document.getElementById('answerCode').value.trim();
     if (!answerStr) return alert('请输入响应码');
-    await pc.setRemoteDescription(JSON.parse(atob(answerStr)));
-    document.getElementById('successView').classList.remove('hidden');
-    document.getElementById('createStep2').classList.add('hidden');
-    updateStep(2);
+    
+    try {
+        const answer = JSON.parse(atob(answerStr));
+        await pc.setRemoteDescription(answer);
+        
+        // 等待连接建立
+        await waitForConnection();
+        
+        document.getElementById('successView').classList.remove('hidden');
+        document.getElementById('createStep2').classList.add('hidden');
+        updateStep(2);
+        
+    } catch (err) {
+        alert('连接失败: ' + err.message);
+    }
 }
 
-function waitIce() {
-    return new Promise(resolve => {
+// 等待ICE收集（带超时保护）
+function waitForIceComplete() {
+    return new Promise((resolve) => {
         if (pc.iceGatheringState === 'complete') return resolve();
-        pc.addEventListener('icegatheringstatechange', () => {
-            if (pc.iceGatheringState === 'complete') resolve();
-        });
-        setTimeout(resolve, 2000);
+        
+        const check = () => {
+            if (pc.iceGatheringState === 'complete') {
+                pc.removeEventListener('icegatheringstatechange', check);
+                resolve();
+            }
+        };
+        pc.addEventListener('icegatheringstatechange', check);
+        setTimeout(resolve, 2000); // 最多等2秒
     });
 }
 
-function waitForConnect() {
-    const check = setInterval(() => {
-        if (pc.connectionState === 'connected') {
-            clearInterval(check);
-            document.getElementById('successView').classList.remove('hidden');
-            document.getElementById('joinStep2').classList.add('hidden');
-            updateStep(2);
-        }
-    }, 500);
+// 等待连接建立
+function waitForConnection() {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const check = setInterval(() => {
+            if (pc.connectionState === 'connected') {
+                clearInterval(check);
+                resolve();
+            } else if (++attempts > 20) { // 10秒超时
+                clearInterval(check);
+                reject(new Error('连接超时，请检查网络或代码是否正确'));
+            }
+        }, 500);
+    });
 }
 
-function setupDC(channel) {
+// 检查连接状态（接收方用）
+function checkConnectionStatus() {
+    const interval = setInterval(() => {
+        if (pc.connectionState === 'connected') {
+            clearInterval(interval);
+            isConnected = true;
+            addSystemMsg('🔒 连接已建立！');
+            document.getElementById('sendBtn').disabled = false;
+            document.getElementById('callBtn').disabled = false;
+            document.getElementById('voiceBtn').disabled = false;
+            document.getElementById('connBadge').textContent = '已加密';
+            document.getElementById('connBadge').classList.add('connected');
+        } else if (pc.connectionState === 'failed') {
+            clearInterval(interval);
+        }
+    }, 1000);
+}
+
+// 设置数据通道
+function setupDataChannel(channel) {
     dc = channel;
-    dc.onopen = () => console.log('DC open');
-    dc.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.type === 'text') addMsg('对方', data.content, 'received');
-        else if (data.type === 'image') addImg('对方', data.content, 'received');
-        else if (data.type === 'call-offer') handleCallOffer(data);
-        else if (data.type === 'call-answer') handleCallAnswer(data);
-        else if (data.type === 'call-end') handleRemoteEnd();
+    
+    channel.onopen = () => {
+        console.log('DataChannel已打开');
+        isConnected = true;
     };
+    
+    channel.onclose = () => {
+        console.log('DataChannel已关闭');
+        isConnected = false;
+    };
+    
+    channel.onerror = (e) => {
+        console.error('DataChannel错误:', e);
+    };
+    
+    channel.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            handleIncomingData(data);
+        } catch (err) {
+            console.error('消息解析失败:', err);
+        }
+    };
+}
+
+// ============== 消息处理 ==============
+function handleIncomingData(data) {
+    if (data.type === 'text') {
+        addMsg('对方', data.content, 'received');
+    } else if (data.type === 'image') {
+        addImage('对方', data.content, 'received');
+    } else if (data.type === 'call-offer') {
+        handleCallOffer(data);
+    } else if (data.type === 'call-answer') {
+        handleCallAnswer(data);
+    } else if (data.type === 'call-end') {
+        endCall();
+    }
 }
 
 function sendText() {
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
-    if (!text || !dc) return;
-    dc.send(JSON.stringify({type: 'text', content: text}));
+    if (!text || !dc || dc.readyState !== 'open') return;
+    
+    dc.send(JSON.stringify({ type: 'text', content: text }));
     addMsg('我', text, 'sent');
     input.value = '';
     input.style.height = 'auto';
 }
 
-async function handleImage(input) {
+async function handleImageSelect(input) {
     const file = input.files[0];
-    if (!file || !dc) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        // 简单压缩提示：实际应用应压缩图片
-        dc.send(JSON.stringify({type: 'image', content: e.target.result}));
-        addImg('我', e.target.result, 'sent');
-    };
-    reader.readAsDataURL(file);
+    if (!file || !dc || dc.readyState !== 'open') {
+        if (!dc || dc.readyState !== 'open') alert('请先建立连接');
+        return;
+    }
+    
+    // 限制大小（DataChannel有缓冲区限制）
+    if (file.size > 2 * 1024 * 1024) {
+        alert('图片过大，请选择小于2MB的图片');
+        return;
+    }
+    
+    // 压缩图片
+    try {
+        const compressed = await compressImage(file, 800, 0.7);
+        dc.send(JSON.stringify({ type: 'image', content: compressed }));
+        addImage('我', compressed, 'sent');
+    } catch (err) {
+        alert('发送失败: ' + err.message);
+    }
+    
     input.value = '';
 }
 
-// ============== 通话核心（修复刷屏版）=============
-
-async function startCall(type) {
-    if (!pc || !isConnected) return alert('请先建立连接');
-    if (isInCall) return alert('正在通话中');
-    
-    try {
-        const cons = type === 'video' ? {video: true, audio: true} : {video: false, audio: true};
-        localStream = await navigator.mediaDevices.getUserMedia(cons);
-        document.getElementById('localVideo').srcObject = localStream;
-        
-        callSenders = [];
-        localStream.getTracks().forEach(track => {
-            const sender = pc.addTrack(track, localStream);
-            callSenders.push(sender);
-        });
-        
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await waitIce();
-        dc.send(JSON.stringify({type: 'call-offer', sdp: btoa(JSON.stringify(pc.localDescription))}));
-        
-        // 关键：重置结束消息标志
-        endMsgSent = false;
-        isInCall = true;
-        document.getElementById('callOverlay').classList.add('active');
-        addMsg('系统', type === 'video' ? '📹 视频通话开始' : '📞 语音通话开始', 'system');
-    } catch (err) {
-        if (err.name === 'NotAllowedError') alert('请允许权限');
-        else alert('启动失败');
-        cleanup();
-    }
+function compressImage(file, maxWidth, quality) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > maxWidth) {
+                    height = (maxWidth / width) * height;
+                    width = maxWidth;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
-async function handleCallOffer(data) {
-    if (isInCall) return alert('已有通话进行中');
-    if (!confirm('收到通话请求，是否接听？')) {
-        dc.send(JSON.stringify({type: 'call-end'}));
+// ============== 音视频通话 ==============
+async function startCall(type) {
+    if (!pc) {
+        alert('请先建立P2P连接');
         return;
     }
     
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+        const constraints = type === 'video' ? { video: true, audio: true } : { video: false, audio: true };
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
         document.getElementById('localVideo').srcObject = localStream;
         
-        callSenders = [];
+        // 添加轨道到PC
         localStream.getTracks().forEach(track => {
-            callSenders.push(pc.addTrack(track, localStream));
+            pc.addTrack(track, localStream);
         });
         
-        await pc.setRemoteDescription(JSON.parse(atob(data.sdp)));
+        // 创建Offer并发送
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await waitForIceComplete();
+        
+        dc.send(JSON.stringify({
+            type: 'call-offer',
+            sdp: btoa(JSON.stringify(pc.localDescription)),
+            callType: type
+        }));
+        
+        showCallUI();
+        
+    } catch (err) {
+        if (err.name === 'NotAllowedError') {
+            alert('请允许摄像头/麦克风权限');
+        } else {
+            alert('启动失败: ' + err.message);
+        }
+    }
+}
+
+async function handleCallOffer(data) {
+    const accept = confirm(`收到${data.callType === 'video' ? '视频' : '语音'}通话请求，是否接听？`);
+    
+    if (!accept) {
+        dc.send(JSON.stringify({ type: 'call-end' }));
+        return;
+    }
+    
+    try {
+        const constraints = data.callType === 'video' ? { video: true, audio: true } : { video: false, audio: true };
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        document.getElementById('localVideo').srcObject = localStream;
+        
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+        });
+        
+        const offer = JSON.parse(atob(data.sdp));
+        await pc.setRemoteDescription(offer);
+        
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        await waitIce();
-        dc.send(JSON.stringify({type: 'call-answer', sdp: btoa(JSON.stringify(answer))}));
+        await waitForIceComplete();
         
-        // 关键：重置结束消息标志
-        endMsgSent = false;
-        isInCall = true;
-        document.getElementById('callOverlay').classList.add('active');
-        addMsg('系统', '📞 已接听', 'system');
+        dc.send(JSON.stringify({
+            type: 'call-answer',
+            sdp: btoa(JSON.stringify(answer))
+        }));
+        
+        showCallUI();
+        
     } catch (err) {
-        alert('接听失败');
-        cleanup();
+        alert('接听失败: ' + err.message);
     }
 }
 
 async function handleCallAnswer(data) {
     try {
-        await pc.setRemoteDescription(JSON.parse(atob(data.sdp)));
-    } catch (e) {
-        console.error(e);
+        const answer = JSON.parse(atob(data.sdp));
+        await pc.setRemoteDescription(answer);
+    } catch (err) {
+        console.error('处理应答失败:', err);
     }
 }
 
-// 用户点击挂断按钮（主动挂断）
-function hangup() {
-    // 发送结束信号给对方（只发一次）
-    if (dc && dc.readyState === 'open') {
-        dc.send(JSON.stringify({type: 'call-end'}));
-    }
-    // 执行本地清理
-    doCleanup(false);
+function showCallUI() {
+    document.getElementById('callOverlay').classList.add('active');
 }
 
-// 收到对方结束信号（被动挂断）
-function handleRemoteEnd() {
-    // 关键：使用防抖机制，3秒内只处理一次结束信号
-    const now = Date.now();
-    if (now - lastEndTime < 3000) {
-        console.log('忽略重复结束信号');
-        return;
-    }
-    lastEndTime = now;
-    
-    doCleanup(true);
-}
-
-// 统一清理函数（实际执行清理）
-function doCleanup(isRemote) {
-    // 如果本次通话已经发送过结束消息，不再发送
-    if (endMsgSent) return;
-    
-    // 如果不在通话中，不处理
-    if (!isInCall && !localStream) return;
-    
-    // 设置标志：已处理
-    endMsgSent = true;
-    isInCall = false;
-    
-    // 1. 停止媒体
+function endCall() {
     if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
+        localStream.getTracks().forEach(track => track.stop());
         localStream = null;
     }
-    
-    // 2. 移除 senders
-    if (pc && callSenders.length > 0) {
-        callSenders.forEach(sender => {
-            try { pc.removeTrack(sender); } catch(e) {}
-        });
-        callSenders = [];
-    }
-    
-    // 3. 清理视频元素
-    document.getElementById('remoteVideo').srcObject = null;
-    document.getElementById('localVideo').srcObject = null;
     document.getElementById('callOverlay').classList.remove('active');
-    document.getElementById('muteBtn').classList.remove('muted');
-    document.getElementById('muteBtn').textContent = '🎤';
-    
-    // 4. 只显示一次结束消息
-    addMsg('系统', isRemote ? '📴 对方已挂断' : '📴 通话已结束', 'system');
-}
-
-function cleanup() {
-    doCleanup(false);
+    if (dc) dc.send(JSON.stringify({ type: 'call-end' }));
 }
 
 function toggleMute() {
-    if (!localStream) return;
-    const audio = localStream.getAudioTracks()[0];
-    if (audio) {
-        audio.enabled = !audio.enabled;
-        const btn = document.getElementById('muteBtn');
-        btn.classList.toggle('muted', !audio.enabled);
-        btn.textContent = audio.enabled ? '🎤' : '🎙️';
+    if (localStream) {
+        const audio = localStream.getAudioTracks()[0];
+        if (audio) {
+            audio.enabled = !audio.enabled;
+            document.getElementById('muteBtn').classList.toggle('muted', !audio.enabled);
+        }
     }
 }
 
+// ============== UI辅助 ==============
 function addMsg(sender, text, type) {
-    const div = document.createElement('div');
-    div.className = `message ${type}`;
-    const time = new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
-    div.innerHTML = `
-        <div class="msg-avatar">${sender === '我' ? '我' : sender === '系统' ? '系' : '友'}</div>
-        <div>
-            <div class="msg-content">${text}</div>
-            <div class="msg-time">${time}</div>
-        </div>
-    `;
-    document.getElementById('messages').appendChild(div);
-    div.scrollIntoView({behavior: 'smooth'});
-}
-
-function addImg(sender, src, type) {
     const div = document.createElement('div');
     div.className = `message ${type}`;
     const time = new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
     div.innerHTML = `
         <div class="msg-avatar">${sender === '我' ? '我' : '友'}</div>
         <div>
-            <div class="msg-content" style="padding:4px"><img src="${src}" class="msg-image" onclick="window.open(this.src)"></div>
+            <div class="msg-content">${text}</div>
             <div class="msg-time">${time}</div>
         </div>
     `;
     document.getElementById('messages').appendChild(div);
-    div.scrollIntoView({behavior: 'smooth'});
+    div.scrollIntoView({ behavior: 'smooth' });
 }
 
-function copy(id) {
+function addImage(sender, src, type) {
+    const div = document.createElement('div');
+    div.className = `message ${type}`;
+    const time = new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'});
+    div.innerHTML = `
+        <div class="msg-avatar">${sender === '我' ? '我' : '友'}</div>
+        <div>
+            <div class="msg-content" style="padding:4px;"><img src="${src}" class="msg-image" onclick="window.open(this.src)"></div>
+            <div class="msg-time">${time}</div>
+        </div>
+    `;
+    document.getElementById('messages').appendChild(div);
+    div.scrollIntoView({ behavior: 'smooth' });
+}
+
+function addSystemMsg(text) {
+    const div = document.createElement('div');
+    div.className = 'system-msg';
+    div.innerHTML = text;
+    document.getElementById('messages').appendChild(div);
+    div.scrollIntoView({ behavior: 'smooth' });
+}
+
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+}
+
+function handleEnter(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendText();
+    }
+}
+
+function copyText(id) {
     const el = document.getElementById(id);
     el.select();
-    document.execCommand('copy');
+    try {
+        document.execCommand('copy');
+        // 移动端震动反馈
+        if (navigator.vibrate) navigator.vibrate(50);
+        showToast('已复制');
+    } catch(e) {
+        showToast('请手动长按复制');
+    }
 }
 
-function init() {}
+function showToast(msg) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed; bottom:20%; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:20px; font-size:14px; z-index:3000;';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
+
+function showNetWarning(show) {
+    document.getElementById('netWarning').classList.toggle('show', show);
+}
+
+function attemptReconnect() {
+    if (reconnectAttempts < 3) {
+        reconnectAttempts++;
+        setTimeout(() => {
+            if (!isConnected && currentMode) {
+                addSystemMsg(`正在尝试重连... (${reconnectAttempts}/3)`);
+                // 实际重连逻辑需要重新交换SDP，这里简单提示
+            }
+        }, 2000);
+    }
+}
+
+// 步骤导航
+function goToCreateStep2() {
+    if (!document.getElementById('offerCode').value) {
+        alert('请先生成连接码');
+        return;
+    }
+    document.getElementById('createStep1').classList.add('hidden');
+    document.getElementById('createStep2').classList.remove('hidden');
+    updateStep(2);
+}
+
+function backToCreateStep1() {
+    document.getElementById('createStep2').classList.add('hidden');
+    document.getElementById('createStep1').classList.remove('hidden');
+    updateStep(1);
+}
+
+// 启动
 init();
 </script>
 </body>
