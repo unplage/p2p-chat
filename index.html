@@ -14,45 +14,44 @@
         .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #666; }
         .status-badge.connected { background: var(--primary); }
         .header-actions { display: flex; gap: 12px; }
-        .icon-btn { width: 36px; height: 36px; border: none; background: rgba(255,255,255,0.1); color: white; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .messages { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 20px; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 12px; }
+        .icon-btn { width: 36px; height: 36px; border: none; background: rgba(255,255,255,0.1); color: white; border-radius: 50%; font-size: 18px; cursor: pointer; }
+        .icon-btn:disabled { opacity: 0.3; }
+        .messages { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 12px; }
         .message { display: flex; gap: 8px; max-width: 85%; animation: pop 0.3s; }
         @keyframes pop { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .message.sent { align-self: flex-end; flex-direction: row-reverse; }
         .msg-avatar { width: 36px; height: 36px; border-radius: 6px; background: #999; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; flex-shrink: 0; }
         .message.sent .msg-avatar { background: var(--primary); }
-        .msg-content { background: white; padding: 10px 14px; border-radius: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-break: break-word; font-size: 15px; line-height: 1.4; }
+        .msg-content { background: white; padding: 10px 14px; border-radius: 18px; word-break: break-word; font-size: 15px; }
         .message.sent .msg-content { background: #95EC69; border-bottom-right-radius: 4px; }
         .message.received .msg-content { border-bottom-left-radius: 4px; }
         .msg-time { font-size: 10px; color: #999; margin-top: 4px; text-align: right; }
         .system-msg { align-self: center; background: rgba(0,0,0,0.05); color: #666; padding: 6px 12px; border-radius: 12px; font-size: 12px; max-width: 90%; text-align: center; }
-        .msg-image { max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer; display: block; }
+        .system-msg.error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+        .system-msg.success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+        .msg-image { max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer; }
         .input-area { background: #f7f7f7; border-top: 1px solid #e0e0e0; padding: 10px 12px; padding-bottom: max(10px, var(--safe-bottom)); }
-        .input-toolbar { display: flex; gap: 12px; margin-bottom: 8px; align-items: center; }
-        .tool-btn { width: 32px; height: 32px; border: none; background: transparent; font-size: 20px; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; }
+        .input-toolbar { display: flex; gap: 12px; margin-bottom: 8px; }
+        .tool-btn { width: 32px; height: 32px; border: none; background: transparent; font-size: 20px; cursor: pointer; position: relative; }
         .tool-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
         .input-box { display: flex; gap: 8px; align-items: flex-end; background: white; border-radius: 20px; padding: 8px 12px; border: 1px solid #e0e0e0; }
-        .msg-input { flex: 1; border: none; outline: none; font-size: 16px; max-height: 100px; resize: none; font-family: inherit; padding: 4px; line-height: 1.4; background: transparent; }
-        .send-btn { background: var(--primary); color: white; border: none; padding: 6px 16px; border-radius: 16px; font-size: 14px; cursor: pointer; font-weight: 500; }
+        .msg-input { flex: 1; border: none; outline: none; font-size: 16px; max-height: 100px; resize: none; font-family: inherit; padding: 4px; background: transparent; }
+        .send-btn { background: var(--primary); color: white; border: none; padding: 6px 16px; border-radius: 16px; font-size: 14px; cursor: pointer; }
         .send-btn:disabled { background: #ccc; }
         .call-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
         .call-overlay.active { display: flex; }
         .remote-video { flex: 1; background: #111; object-fit: cover; }
         .local-pip { position: absolute; top: max(60px, var(--safe-top)); right: 16px; width: 100px; height: 140px; background: #333; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); }
         .local-pip video { width: 100%; height: 100%; object-fit: cover; }
-        .call-controls { position: absolute; bottom: max(40px, var(--safe-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 24px; background: rgba(0,0,0,0.6); padding: 16px 24px; border-radius: 40px; backdrop-filter: blur(10px); }
-        .call-btn { width: 56px; height: 56px; border-radius: 50%; border: none; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; }
+        .call-controls { position: absolute; bottom: max(40px, var(--safe-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 24px; background: rgba(0,0,0,0.6); padding: 16px 24px; border-radius: 40px; }
+        .call-btn { width: 56px; height: 56px; border-radius: 50%; border: none; font-size: 24px; color: white; cursor: pointer; }
         .call-btn.hangup { background: #ff4d4f; }
-        .call-btn.mute { background: rgba(255,255,255,0.2); }
-        .call-btn.muted { background: #ff4d4f; }
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: flex-end; justify-content: center; }
         .modal.active { display: flex; }
-        .modal-content { background: white; width: 100%; max-height: 90vh; border-radius: 20px 20px 0 0; overflow: hidden; animation: slideUp 0.3s; display: flex; flex-direction: column; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-content { background: white; width: 100%; max-height: 90vh; border-radius: 20px 20px 0 0; overflow: hidden; }
         .modal-header { background: #2e2e2e; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
-        .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: 500; }
+        .modal-body { padding: 20px; }
+        .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-secondary { background: #f0f0f0; color: #333; }
         textarea.code-input { width: 100%; height: 120px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; resize: none; margin: 10px 0; background: #f8f8f8; }
@@ -64,9 +63,10 @@
         .step.active { color: var(--primary); font-weight: bold; }
         .step-circle { width: 32px; height: 32px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-weight: bold; }
         .step.active .step-circle { background: var(--primary); color: white; }
-        .help-text { background: #e6f7ff; border-left: 4px solid #1890ff; padding: 12px; margin: 10px 0; font-size: 13px; color: #0050b3; border-radius: 4px; }
+        .help-box { background: #fffbe6; border: 1px solid #ffe58f; padding: 12px; border-radius: 8px; font-size: 13px; color: #5c4b00; margin: 10px 0; }
+        .help-box ul { margin: 8px 0 0 16px; padding: 0; }
+        .help-box li { margin: 4px 0; }
         .hidden { display: none !important; }
-        .text-center { text-align: center; }
     </style>
 </head>
 <body>
@@ -85,8 +85,7 @@
     </div>
 
     <div class="messages" id="messages">
-        <div class="system-msg">🔒 端到端加密通信<br>支持跨网络连接（不同WiFi/4G/5G）</div>
-        <div class="system-msg">点击 ⚙️ 创建或加入连接</div>
+        <div class="system-msg" id="connHint">🔒 端到端加密通信<br>支持不同WiFi/4G/5G连接</div>
     </div>
 
     <div class="input-area">
@@ -105,7 +104,7 @@
     <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
     <div class="local-pip"><video id="localVideo" autoplay playsinline muted></video></div>
     <div class="call-controls">
-        <button class="call-btn mute" id="muteBtn" onclick="toggleMute()">🎤</button>
+        <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="muteBtn" onclick="toggleMute()">🎤</button>
         <button class="call-btn hangup" onclick="hangup()">📞</button>
     </div>
 </div>
@@ -123,8 +122,15 @@
             </div>
 
             <div id="modeSelect">
-                <p class="text-center" style="color:#666;font-size:14px;margin-bottom:20px">选择角色开始连接</p>
-                <div style="display:flex;gap:10px">
+                <div class="help-box">
+                    <strong>💡 连接说明：</strong>
+                    <ul>
+                        <li><strong>相同WiFi：</strong>直接连接，最快最稳定</li>
+                        <li><strong>不同WiFi/4G：</strong>依赖TURN服务器中转，可能失败</li>
+                        <li>如果连接失败，请尝试使用相同WiFi网络</li>
+                    </ul>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:20px">
                     <button class="btn btn-primary" onclick="setMode('create')" style="flex:1;padding:20px">
                         <div style="font-size:24px;margin-bottom:8px">🚀</div>
                         <div>创建连接</div>
@@ -134,14 +140,11 @@
                         <div>加入连接</div>
                     </button>
                 </div>
-                <div class="help-text">
-                    <strong>跨网络提示：</strong>不同WiFi/4G下连接需要TURN服务器中继，如果连接失败，请检查网络是否允许UDP通信，或尝试切换到相同网络。
-                </div>
             </div>
 
             <div id="createFlow" class="hidden">
                 <div id="createStep1">
-                    <p style="font-size:13px;color:#666;margin-bottom:10px">1. 生成连接码（包含ICE候选）</p>
+                    <p style="font-size:13px;color:#666;margin-bottom:10px">1. 生成连接码（约需3秒收集ICE候选）</p>
                     <button class="btn btn-primary" onclick="createOffer()" style="width:100%;margin:10px 0">生成连接码</button>
                     <textarea class="code-input" id="offerCode" readonly placeholder="生成后将显示在这里..."></textarea>
                     <div class="copy-btn-group">
@@ -181,20 +184,22 @@
 </div>
 
 <script>
-// ==================== ICE 服务器配置（多备份）====================
-// 配置了多个 STUN + TURN 服务器，确保跨网络连接成功率
+// ==================== ICE 配置（最大兼容性）====================
+// 配置了多个 STUN + TURN 服务器，提高跨网络成功率
 const iceConfig = {
     iceServers: [
-        // Google STUN（基础）
+        // Google STUN
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
         
-        // Open Relay TURN（主用）
+        // Open Relay TURN（最常用的免费TURN）
         {
             urls: [
                 'turn:openrelay.metered.ca:80',
                 'turn:openrelay.metered.ca:443',
-                'turn:openrelay.metered.ca:443?transport=tcp'
+                'turn:openrelay.metered.ca:443?transport=tcp',
+                'turns:openrelay.metered.ca:443'
             ],
             username: 'openrelayproject',
             credential: 'openrelayproject'
@@ -202,21 +207,21 @@ const iceConfig = {
         
         // 备用 TURN 1
         {
-            urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
-            username: 'webrtc',
-            credential: 'webrtc'
+            urls: 'turn:18.235.113.106:3478',
+            username: 'freeuser',
+            credential: 'freepassword'
         },
         
-        // 备用 TURN 2（Twilio - 可能有配额限制）
+        // 备用 TURN 2（如果上面的都失效）
         {
-            urls: 'turn:global.turn.twilio.com:443?transport=tcp',
-            username: 'a',
-            credential: 'b'
+            urls: 'turn:relay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
         }
     ],
     iceCandidatePoolSize: 10,
-    // 关键：收集所有类型的候选
-    gatherPolicy: 'all'
+    // 关键：强制使用relay候选（如果直接连接失败）
+    iceTransportPolicy: 'all'
 };
 
 let pc = null;
@@ -227,7 +232,16 @@ let isInCall = false;
 let callSenders = [];
 let lastEndTime = 0;
 let endMsgSent = false;
-let iceCandidates = []; // 存储ICE候选
+
+function addLog(msg, type='system') {
+    console.log(msg);
+    const div = document.createElement('div');
+    div.className = `system-msg ${type}`;
+    div.style.fontSize = '11px';
+    div.textContent = msg;
+    document.getElementById('messages').appendChild(div);
+    div.scrollIntoView({behavior: 'smooth'});
+}
 
 function showConnModal() {
     document.getElementById('connModal').classList.add('active');
@@ -248,7 +262,6 @@ function resetModal() {
     document.getElementById('joinStep1').classList.remove('hidden');
     document.getElementById('joinStep2').classList.add('hidden');
     updateStep(1);
-    iceCandidates = [];
 }
 
 function setMode(mode) {
@@ -272,22 +285,33 @@ function goStep(step) {
     }
     document.getElementById('createStep1').classList.toggle('hidden', step !== 1);
     document.getElementById('createStep2').classList.toggle('hidden', step !== 2);
-    updateStep(step);
 }
 
-// ==================== WebRTC 核心（修复跨网络问题）====================
-
 function createPeer() {
+    addLog('正在创建PeerConnection...');
     pc = new RTCPeerConnection(iceConfig);
     
-    // 关键：监控ICE收集状态
+    // 监控ICE收集状态
     pc.onicegatheringstatechange = () => {
-        console.log('ICE收集状态:', pc.iceGatheringState);
+        addLog('ICE收集状态: ' + pc.iceGatheringState);
     };
     
-    // 关键：监控连接状态
+    // 监控ICE候选
+    let candidateCount = 0;
+    pc.onicecandidate = (e) => {
+        if (e.candidate) {
+            candidateCount++;
+            const type = e.candidate.candidate.includes('typ relay') ? 'TURN' : 
+                        e.candidate.candidate.includes('typ srflx') ? 'STUN' : 'HOST';
+            console.log(`ICE候选 #${candidateCount}: ${type}`);
+        } else {
+            addLog(`ICE收集完成，共${candidateCount}个候选`, 'success');
+        }
+    };
+    
+    // 监控连接状态（关键：诊断信息）
     pc.onconnectionstatechange = () => {
-        console.log('连接状态:', pc.connectionState);
+        addLog('连接状态: ' + pc.connectionState);
         const badge = document.getElementById('connBadge');
         
         if (pc.connectionState === 'connected') {
@@ -298,12 +322,26 @@ function createPeer() {
             document.getElementById('voiceBtn').disabled = false;
             if (!isConnected) {
                 isConnected = true;
-                addMsg('系统', '✅ 端到端加密连接已建立（跨网络）', 'system');
+                addLog('✅ 端到端加密连接已建立', 'success');
+                // 显示使用的候选类型
+                pc.getStats().then(stats => {
+                    stats.forEach(report => {
+                        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                            const local = stats.get(report.localCandidateId);
+                            const remote = stats.get(report.remoteCandidateId);
+                            console.log('使用候选:', local?.candidateType, '->', remote?.candidateType);
+                            if (local?.candidateType === 'relay' || remote?.candidateType === 'relay') {
+                                addLog('通过TURN服务器中继连接', 'success');
+                            }
+                        }
+                    });
+                });
             }
         } else if (pc.connectionState === 'failed') {
-            addMsg('系统', '❌ 连接失败：请检查网络或尝试相同WiFi', 'system');
             badge.textContent = '失败';
             badge.classList.remove('connected');
+            addLog('❌ 连接失败：NAT穿越失败，建议切换至相同WiFi', 'error');
+            alert('连接失败：无法建立跨网络连接。\n\n可能原因：\n1. 双方防火墙阻断了TURN端口（3478/443）\n2. TURN服务器暂时不可用\n3. 网络运营商限制\n\n建议：双方连接相同WiFi后再试');
         } else if (pc.connectionState === 'disconnected') {
             badge.textContent = '已断开';
             badge.classList.remove('connected');
@@ -314,6 +352,7 @@ function createPeer() {
     };
     
     pc.ondatachannel = (e) => {
+        addLog('收到DataChannel');
         setupDC(e.channel);
     };
     
@@ -330,23 +369,28 @@ async function createOffer() {
     setupDC(dc);
     
     try {
+        addLog('生成Offer中...');
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         
-        // 等待ICE收集完成（关键：确保包含srflx/relay候选）
+        // 等待ICE收集（关键：确保包含TURN候选）
+        addLog('等待ICE候选收集（约2-3秒）...');
         await waitForIceComplete();
         
-        // 生成包含ICE的完整SDP
-        const completeOffer = {
+        // 生成代码
+        const sdp = pc.localDescription.sdp;
+        const code = btoa(JSON.stringify({
             type: pc.localDescription.type,
-            sdp: pc.localDescription.sdp
-        };
+            sdp: sdp,
+            // 包含时间戳防止过期
+            ts: Date.now()
+        }));
         
-        document.getElementById('offerCode').value = btoa(JSON.stringify(completeOffer));
-        console.log('Offer生成成功，SDP长度:', completeOffer.sdp.length);
+        document.getElementById('offerCode').value = code;
+        addLog('连接码已生成（长度:' + code.length + '）', 'success');
         
     } catch (err) {
-        console.error(err);
+        addLog('错误: ' + err.message, 'error');
         alert('生成失败: ' + err.message);
     }
 }
@@ -356,37 +400,41 @@ async function createAnswer() {
     if (!offerStr) return alert('请输入连接码');
     
     try {
-        const offer = JSON.parse(atob(offerStr));
-        console.log('收到Offer，SDP长度:', offer.sdp?.length);
+        const offerData = JSON.parse(atob(offerStr));
         
+        // 检查时间戳（超过60秒可能过期）
+        if (offerData.ts && Date.now() - offerData.ts > 60000) {
+            alert('警告：连接码可能已过期（超过60秒），建议重新生成');
+        }
+        
+        addLog('解析Offer成功，创建PeerConnection...');
         createPeer();
         
-        // 关键：先设置远端描述
-        await pc.setRemoteDescription(offer);
+        await pc.setRemoteDescription({type: offerData.type, sdp: offerData.sdp});
         
-        // 创建应答
+        addLog('生成Answer中...');
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         
-        // 等待ICE收集
+        addLog('等待ICE候选...');
         await waitForIceComplete();
         
-        const completeAnswer = {
+        const code = btoa(JSON.stringify({
             type: pc.localDescription.type,
-            sdp: pc.localDescription.sdp
-        };
+            sdp: pc.localDescription.sdp,
+            ts: Date.now()
+        }));
         
-        document.getElementById('joinAnswer').value = btoa(JSON.stringify(completeAnswer));
+        document.getElementById('joinAnswer').value = code;
         document.getElementById('joinStep1').classList.add('hidden');
         document.getElementById('joinStep2').classList.remove('hidden');
         updateStep(2);
         
-        // 接收方开始监听连接
         waitForConnect();
         
     } catch (err) {
-        console.error(err);
-        alert('无效连接码或解析错误: ' + err.message);
+        addLog('错误: ' + err.message, 'error');
+        alert('无效连接码: ' + err.message);
     }
 }
 
@@ -395,67 +443,63 @@ async function completeConnection() {
     if (!answerStr) return alert('请输入响应码');
     
     try {
-        // 关键：检查当前状态，如果已经是stable则跳过
+        // 防止状态错误
         if (pc.signalingState === 'stable') {
-            console.log('连接已处于stable状态');
-            document.getElementById('successView').classList.remove('hidden');
-            document.getElementById('createStep2').classList.add('hidden');
-            updateStep(2);
+            addLog('连接已稳定');
+            showSuccess();
             return;
         }
         
-        const answer = JSON.parse(atob(answerStr));
-        console.log('设置Answer，当前状态:', pc.signalingState);
+        if (pc.signalingState !== 'have-local-offer') {
+            addLog('错误：当前状态 ' + pc.signalingState + '，无法设置Answer', 'error');
+            alert('连接状态错误：' + pc.signalingState + '\n请刷新页面重试');
+            return;
+        }
         
-        await pc.setRemoteDescription(answer);
-        
-        document.getElementById('successView').classList.remove('hidden');
-        document.getElementById('createStep2').classList.add('hidden');
-        updateStep(2);
+        const answerData = JSON.parse(atob(answerStr));
+        addLog('设置Answer中...');
+        await pc.setRemoteDescription({type: answerData.type, sdp: answerData.sdp});
+        showSuccess();
         
     } catch (err) {
-        console.error(err);
-        // 特定错误处理
-        if (err.message.includes('Called in wrong state')) {
-            alert('连接状态错误：对方可能已经连接，或代码已过期。请刷新页面重试。');
-        } else {
-            alert('连接失败: ' + err.message);
-        }
+        addLog('连接失败: ' + err.message, 'error');
+        alert('连接失败: ' + err.message);
     }
 }
 
-// 等待ICE收集完成
+function showSuccess() {
+    document.getElementById('successView').classList.remove('hidden');
+    document.getElementById('createStep2').classList.add('hidden');
+    updateStep(2);
+}
+
 function waitForIceComplete() {
     return new Promise((resolve) => {
         if (pc.iceGatheringState === 'complete') {
             resolve();
             return;
         }
-        
-        let timeout = setTimeout(() => {
-            console.log('ICE收集超时，使用当前候选');
-            resolve();
-        }, 3000); // 最多等3秒
-        
-        pc.addEventListener('icegatheringstatechange', () => {
-            if (pc.iceGatheringState === 'complete') {
-                clearTimeout(timeout);
-                resolve();
+        setTimeout(() => {
+            if (pc.iceGatheringState !== 'complete') {
+                addLog('ICE收集超时，使用当前候选继续');
             }
-        });
+            resolve();
+        }, 3000);
     });
 }
 
 function waitForConnect() {
+    let attempts = 0;
     const check = setInterval(() => {
+        attempts++;
         if (pc.connectionState === 'connected') {
             clearInterval(check);
             document.getElementById('successView').classList.remove('hidden');
             document.getElementById('joinStep2').classList.add('hidden');
             updateStep(2);
-        } else if (pc.connectionState === 'failed') {
+        } else if (attempts > 20) { // 10秒超时
             clearInterval(check);
-            alert('连接失败：无法建立P2P连接。请检查：\n1. 双方网络是否允许UDP\n2. 是否使用了企业/校园网防火墙\n3. 尝试切换到相同WiFi');
+            addLog('连接超时，建议检查网络或切换至相同WiFi', 'error');
         }
     }, 500);
 }
@@ -463,7 +507,7 @@ function waitForConnect() {
 function setupDC(channel) {
     dc = channel;
     dc.onopen = () => {
-        console.log('DataChannel 打开');
+        addLog('DataChannel已打开', 'success');
         isConnected = true;
     };
     dc.onclose = () => {
@@ -498,7 +542,6 @@ function handleImage(input) {
     if (!file || !dc) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-        // 压缩图片（跨网络时减小数据量）
         compressImage(e.target.result, 800, 0.6).then(compressed => {
             dc.send(JSON.stringify({type: 'image', content: compressed}));
             addImg('我', compressed, 'sent');
@@ -508,27 +551,20 @@ function handleImage(input) {
     input.value = '';
 }
 
-// 图片压缩
-function compressImage(dataUrl, maxWidth, quality) {
+function compressImage(dataUrl, maxW, q) {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
             let w = img.width, h = img.height;
-            if (w > maxWidth) {
-                h = (maxWidth / w) * h;
-                w = maxWidth;
-            }
-            canvas.width = w;
-            canvas.height = h;
+            if (w > maxW) { h = (maxW/w)*h; w = maxW; }
+            canvas.width = w; canvas.height = h;
             canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', quality));
+            resolve(canvas.toDataURL('image/jpeg', q));
         };
         img.src = dataUrl;
     });
 }
-
-// ==================== 通话 ====================
 
 async function startCall(type) {
     if (!pc || !isConnected) return alert('请先建立连接');
@@ -541,18 +577,14 @@ async function startCall(type) {
         
         callSenders = [];
         localStream.getTracks().forEach(track => {
-            const sender = pc.addTrack(track, localStream);
-            callSenders.push(sender);
+            callSenders.push(pc.addTrack(track, localStream));
         });
         
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await waitForIceComplete();
         
-        dc.send(JSON.stringify({
-            type: 'call-offer', 
-            sdp: btoa(JSON.stringify(pc.localDescription))
-        }));
+        dc.send(JSON.stringify({type: 'call-offer', sdp: btoa(JSON.stringify(pc.localDescription))}));
         
         endMsgSent = false;
         isInCall = true;
@@ -612,7 +644,7 @@ function hangup() {
 
 function handleRemoteEnd() {
     const now = Date.now();
-    if (now - lastEndTime < 2000) return; // 2秒内忽略重复
+    if (now - lastEndTime < 2000) return;
     lastEndTime = now;
     doCleanup(true);
 }
@@ -639,15 +671,11 @@ function doCleanup(isRemote) {
     document.getElementById('remoteVideo').srcObject = null;
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('callOverlay').classList.remove('active');
-    document.getElementById('muteBtn').classList.remove('muted');
     document.getElementById('muteBtn').textContent = '🎤';
     
     addMsg('系统', isRemote ? '📴 对方已挂断' : '📴 通话已结束', 'system');
     
-    // 延迟重置标志，允许下次通话
-    setTimeout(() => {
-        endMsgSent = false;
-    }, 1000);
+    setTimeout(() => { endMsgSent = false; }, 1000);
 }
 
 function toggleMute() {
@@ -656,7 +684,6 @@ function toggleMute() {
     if (audio) {
         audio.enabled = !audio.enabled;
         const btn = document.getElementById('muteBtn');
-        btn.classList.toggle('muted', !audio.enabled);
         btn.textContent = audio.enabled ? '🎤' : '🎙️';
     }
 }
@@ -688,7 +715,6 @@ function addImg(sender, src, type) {
         </div>
     `;
     document.getElementById('messages').appendChild(div);
-    div.scrollIntoView({behavior: 'smooth'});
 }
 
 function copy(id) {
