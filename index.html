@@ -7,7 +7,7 @@
     <link rel="manifest" href="./manifest.json">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        /* ==================== 完整样式 ==================== */
+        /* 完整样式（与之前相同，保留所有样式） */
         :root { --primary: #07C160; --danger: #ff4d4f; --warning: #faad14; --safe-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; height: 100dvh; overflow: hidden; position: fixed; width: 100%; }
@@ -69,16 +69,13 @@
         .system-msg.error { background:#fff2f0; color:var(--danger); border:1px solid #ffccc7; }
         .system-msg.success { background:#f6ffed; color:var(--primary); border:1px solid #b7eb8f; }
         .input-area { background:#f7f7f7; border-top:1px solid #e0e0e0; padding:10px 12px; padding-bottom:max(10px, var(--safe-bottom)); }
-        .input-toolbar { display: flex; gap: 12px; margin-bottom: 8px; }
-        .tool-btn { width: 32px; height: 32px; border: none; background: transparent; font-size: 20px; cursor: pointer; position: relative; }
-        .tool-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-        .input-box { display: flex; gap: 8px; align-items: flex-end; background: white; border-radius: 20px; padding: 8px 12px; border: 1px solid #e0e0e0; }
-        .msg-input { flex: 1; border: none; outline: none; font-size: 16px; max-height: 100px; resize: none; font-family: inherit; padding: 4px; background: transparent; }
-        .send-btn { background: var(--primary); color: white; border: none; padding: 6px 16px; border-radius: 16px; font-size: 14px; cursor: pointer; }
-        .send-btn:disabled { background: #ccc; }
-        /* 语音消息样式 */
-        .voice-message audio { max-width: 200px; height: 40px; outline: none; }
-        .voice-message audio::-webkit-media-controls-panel { background-color: transparent; }
+        .input-toolbar { display:flex; gap:12px; margin-bottom:8px; }
+        .tool-btn { width:32px; height:32px; border:none; background:transparent; font-size:20px; cursor:pointer; position:relative; }
+        .tool-btn input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; }
+        .input-box { display:flex; gap:8px; align-items:flex-end; background:white; border-radius:20px; padding:8px 12px; border:1px solid #e0e0e0; }
+        .msg-input { flex:1; border:none; outline:none; font-size:16px; max-height:100px; resize:none; font-family:inherit; padding:4px; background:transparent; }
+        .send-btn { background:var(--primary); color:white; border:none; padding:6px 16px; border-radius:16px; font-size:14px; cursor:pointer; }
+        .send-btn:disabled { background:#ccc; }
         .call-overlay { position:fixed; inset:0; background:#000; z-index:1000; display:none; flex-direction:column; }
         .call-overlay.active { display:flex; }
         .remote-video { flex:1; background:#111; object-fit:cover; }
@@ -135,7 +132,7 @@
         <div class="chat-container">
             <div class="messages" id="messages">
                 <div class="system-msg" id="connHint">
-                    🔒 端到端加密通信<br>支持文字、图片、语音、文件传输<br>
+                    🔒 端到端加密通信<br>支持文字、图片、文件传输<br>
                     <span style="color:#07C160">点击 ⚙️ 输入房间号建立连接</span>
                 </div>
             </div>
@@ -143,8 +140,6 @@
                 <div class="input-toolbar">
                     <button class="tool-btn">📷<input type="file" accept="image/*" onchange="handleImage(this)" capture="environment"></button>
                     <button class="tool-btn" onclick="document.getElementById('file').click()">📎<input type="file" id="file" style="display:none" onchange="handleFile(this)"></button>
-                    <!-- 新增：语音消息按钮（按住说话） -->
-                    <button class="tool-btn" id="voiceMsgBtn" onmousedown="startVoiceRecording()" ontouchstart="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchend="stopVoiceRecording()" onmouseleave="cancelVoiceRecording()" disabled>🎤</button>
                 </div>
                 <div class="input-box">
                     <textarea class="msg-input" id="msgInput" placeholder="输入消息..." rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
@@ -256,12 +251,6 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 let lastUIUpdate = 0;
 const UI_UPDATE_INTERVAL = 100; // 毫秒
 
-// 语音录制相关变量
-let mediaRecorder = null;
-let audioChunks = [];
-let recordingTimer = null;
-let recordingStartTime = 0;
-
 // ==================== 日志系统 ====================
 function addLog(msg, type='system') {
     console.log(msg);
@@ -312,7 +301,6 @@ function cancelWaiting() {
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('callBtn').disabled = true;
     document.getElementById('voiceBtn').disabled = true;
-    document.getElementById('voiceMsgBtn').disabled = true;
     resetRoomModal();
 }
 
@@ -378,7 +366,7 @@ function handleIncomingCall(call) {
         .catch(err => { alert('无法获取摄像头/麦克风: ' + err.message); call.close(); });
 }
 
-// ==================== 数据连接设置 ====================
+// 设置数据连接（关键修复点：二进制检测增强）
 function setupConnection(connection) {
     conn = connection;
     conn.on('open', () => {
@@ -389,42 +377,34 @@ function setupConnection(connection) {
         document.getElementById('sendBtn').disabled = false;
         document.getElementById('callBtn').disabled = false;
         document.getElementById('voiceBtn').disabled = false;
-        document.getElementById('voiceMsgBtn').disabled = false; // 启用语音按钮
         document.getElementById('waitingView').classList.add('hidden');
         document.getElementById('successView').classList.remove('hidden');
     });
 
     conn.on('data', (data) => {
-        // 增强的二进制检测
-        let buffer = null;
-        if (data instanceof ArrayBuffer) {
-            buffer = data;
-        } else if (ArrayBuffer.isView(data)) {
-            buffer = data.buffer;
-        } else if (data && typeof data === 'object' && data.byteLength !== undefined) {
-            buffer = data;
-        }
-
-        if (buffer) {
+        // 增强的二进制检测：支持 ArrayBuffer 和 TypedArray (如 Uint8Array)
+        if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+            // 如果是 TypedArray，提取其 buffer
+            const buffer = data instanceof ArrayBuffer ? data : data.buffer;
+            console.log(`收到二进制数据，类型: ${data.constructor.name}, 字节长度: ${buffer.byteLength}`);
             handleFileChunk(buffer);
             return;
         }
 
+        // 尝试解析为 JSON
         try {
             const msg = JSON.parse(data);
+            console.log('收到JSON消息:', msg.type);
             switch (msg.type) {
                 case 'text': addMsg('对方', msg.content, 'received'); break;
                 case 'image': addImg('对方', msg.content, 'received'); break;
-                case 'voice': // 新增语音消息处理
-                    addVoiceMsg('对方', msg.data, msg.duration, 'received');
-                    break;
                 case 'file-start': handleFileStart(msg.info); break;
                 case 'file-progress': updateSendProgress(msg.percent); break;
-                case 'file-end': /* 备用 */ break;
+                case 'file-end': /* 备用，实际由分片计数触发 */ break;
                 default: console.log('未知消息类型', msg);
             }
         } catch (e) {
-            console.error('消息解析失败', e);
+            console.error('消息解析失败，原始数据:', data, '错误:', e);
         }
     });
 
@@ -436,7 +416,6 @@ function setupConnection(connection) {
         document.getElementById('sendBtn').disabled = true;
         document.getElementById('callBtn').disabled = true;
         document.getElementById('voiceBtn').disabled = true;
-        document.getElementById('voiceMsgBtn').disabled = true;
     });
     conn.on('error', (err) => { addLog('数据连接错误: ' + err, 'error'); });
 }
@@ -488,7 +467,7 @@ function compressImage(dataUrl, maxW, q) {
     });
 }
 
-// ==================== 文件传输核心 ====================
+// ==================== 文件传输核心（带详细日志）====================
 function handleTransferFile(input) {
     const file = input.files[0];
     if (!file) return;
@@ -536,7 +515,7 @@ async function sendFileViaP2P(file) {
                         break;
                     } catch (e) {
                         console.log(`[发送] 分片 ${chunkIndex} 发送失败，重试 ${retry+1}/3: ${e.message}`);
-                        await new Promise(r => setTimeout(r, 300));
+                        await new Promise(r => setTimeout(r, 200));
                     }
                 }
                 if (!sent) {
@@ -579,7 +558,7 @@ function handleFileStart(info) {
     showReceivingFile(info);
 }
 
-// 接收文件分片
+// 接收文件分片（带节流）
 function handleFileChunk(chunk) {
     if (!fileTransferState.receiving) return;
     
@@ -606,7 +585,7 @@ function handleFileChunk(chunk) {
         
         if (fileTransferState.receivedCount === fileTransferState.fileInfo.chunks) {
             console.log('[接收] 所有分片已收齐，开始重组');
-            updateReceiveProgress();
+            updateReceiveProgress(); // 强制最终更新
             handleFileComplete();
         }
     } else {
@@ -679,111 +658,6 @@ function escapeHTML(str) {
         if (m === '"') return '&quot;';
         return m;
     });
-}
-
-// ==================== 语音消息录制 ====================
-async function startVoiceRecording() {
-    if (!conn || conn.open !== true) {
-        alert('请先建立连接');
-        return;
-    }
-    if (mediaRecorder && mediaRecorder.state === 'recording') return;
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
-        
-        mediaRecorder.onstop = () => {
-            stream.getTracks().forEach(track => track.stop());
-        };
-        
-        mediaRecorder.start();
-        recordingStartTime = Date.now();
-        
-        document.getElementById('voiceMsgBtn').style.backgroundColor = 'var(--danger)';
-        
-        // 最长录音 60 秒
-        recordingTimer = setTimeout(() => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                stopVoiceRecording(true);
-            }
-        }, 60000);
-        
-    } catch (err) {
-        console.error('无法访问麦克风:', err);
-        alert('无法访问麦克风: ' + err.message);
-    }
-}
-
-function stopVoiceRecording(autoSent = false) {
-    if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
-    
-    clearTimeout(recordingTimer);
-    mediaRecorder.stop();
-    
-    document.getElementById('voiceMsgBtn').style.backgroundColor = '';
-    
-    setTimeout(() => {
-        if (audioChunks.length === 0) return;
-        
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            const base64Audio = e.target.result;
-            
-            conn.send(JSON.stringify({
-                type: 'voice',
-                data: base64Audio,
-                duration: Math.round((Date.now() - recordingStartTime) / 1000)
-            }));
-            
-            addVoiceMsg('我', base64Audio, (Date.now() - recordingStartTime) / 1000, 'sent');
-        };
-        
-        reader.readAsDataURL(audioBlob);
-    }, 200);
-}
-
-function cancelVoiceRecording() {
-    if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
-    
-    clearTimeout(recordingTimer);
-    mediaRecorder.stop();
-    
-    audioChunks = [];
-    document.getElementById('voiceMsgBtn').style.backgroundColor = '';
-    
-    if (mediaRecorder.stream) {
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
-    }
-}
-
-function addVoiceMsg(sender, base64Data, duration, type) {
-    const messages = document.getElementById('messages');
-    const div = document.createElement('div');
-    div.className = `message ${type}`;
-    const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
-    
-    div.innerHTML = `
-        <div class="msg-avatar">${sender === '我' ? '我' : '友'}</div>
-        <div>
-            <div class="msg-content voice-message" style="padding:8px 12px; background:${type === 'sent' ? '#95EC69' : 'white'};">
-                <audio controls src="${base64Data}" style="width:200px; height:40px;"></audio>
-                <div style="font-size:11px; color:#666; margin-top:4px;">🎤 ${Math.round(duration)} 秒</div>
-            </div>
-            <div class="msg-time">${time}</div>
-        </div>
-    `;
-    messages.appendChild(div);
-    div.scrollIntoView({behavior:'smooth'});
 }
 
 // ==================== 音视频通话 ====================
@@ -878,7 +752,7 @@ if (dropZone) {
     });
 }
 
-function init() { console.log('P2P 房间直连版（完整语音功能）已初始化'); }
+function init() { console.log('P2P 房间直连版（增强二进制检测）已初始化'); }
 init();
 </script>
 </body>
