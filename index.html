@@ -7,6 +7,7 @@
     <link rel="manifest" href="./manifest.json">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
+        /* 完整样式（与之前相同，保留所有样式） */
         :root { --primary: #07C160; --danger: #ff4d4f; --warning: #faad14; --safe-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; height: 100dvh; overflow: hidden; position: fixed; width: 100%; }
@@ -365,7 +366,7 @@ function handleIncomingCall(call) {
         .catch(err => { alert('无法获取摄像头/麦克风: ' + err.message); call.close(); });
 }
 
-// 设置数据连接
+// 设置数据连接（关键修复点：二进制检测增强）
 function setupConnection(connection) {
     conn = connection;
     conn.on('open', () => {
@@ -381,21 +382,30 @@ function setupConnection(connection) {
     });
 
     conn.on('data', (data) => {
-        if (data instanceof ArrayBuffer) {
-            handleFileChunk(data);
+        // 增强的二进制检测：支持 ArrayBuffer 和 TypedArray (如 Uint8Array)
+        if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+            // 如果是 TypedArray，提取其 buffer
+            const buffer = data instanceof ArrayBuffer ? data : data.buffer;
+            console.log(`收到二进制数据，类型: ${data.constructor.name}, 字节长度: ${buffer.byteLength}`);
+            handleFileChunk(buffer);
             return;
         }
+
+        // 尝试解析为 JSON
         try {
             const msg = JSON.parse(data);
+            console.log('收到JSON消息:', msg.type);
             switch (msg.type) {
                 case 'text': addMsg('对方', msg.content, 'received'); break;
                 case 'image': addImg('对方', msg.content, 'received'); break;
                 case 'file-start': handleFileStart(msg.info); break;
                 case 'file-progress': updateSendProgress(msg.percent); break;
-                case 'file-end': /* 备用 */ break;
+                case 'file-end': /* 备用，实际由分片计数触发 */ break;
                 default: console.log('未知消息类型', msg);
             }
-        } catch (e) { console.error('消息解析失败', e); }
+        } catch (e) {
+            console.error('消息解析失败，原始数据:', data, '错误:', e);
+        }
     });
 
     conn.on('close', () => {
@@ -742,7 +752,7 @@ if (dropZone) {
     });
 }
 
-function init() { console.log('P2P 房间直连版（调试日志版）已初始化'); }
+function init() { console.log('P2P 房间直连版（增强二进制检测）已初始化'); }
 init();
 </script>
 </body>
