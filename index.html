@@ -277,8 +277,8 @@ let heartbeatInterval = null;
 let heartbeatTimeout = null;
 let consecutiveFailures = 0;
 const HEARTBEAT_INTERVAL = 10000; // 10秒发送一次ping
-const HEARTBEAT_TIMEOUT = 5000;    // 等待pong超时5秒
-const MAX_CONSECUTIVE_FAILURES = 3;
+const HEARTBEAT_TIMEOUT = 60000;    // 等待pong超时5秒
+const MAX_CONSECUTIVE_FAILURES = 5;
 
 // ==================== 日志系统 ====================
 function addLog(msg, type='system') {
