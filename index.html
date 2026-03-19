@@ -73,7 +73,15 @@
         .action-btn { width: 44px; height: 44px; border: none; background: transparent; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
         .action-btn:hover { background: #f0f0f0; }
         .action-btn:active { background: #e0e0e0; }
-        .action-btn input[type="file"] { position: absolute; opacity: 0; width: 0; height: 0; }
+        .action-btn input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }  
         .send-btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 40px; font-size: 16px; cursor: pointer; white-space: nowrap; }
         .send-btn:disabled { background: #ccc; }
         /* 语音消息样式 */
