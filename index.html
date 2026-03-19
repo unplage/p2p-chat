@@ -152,7 +152,7 @@
                     <textarea class="msg-input" id="msgInput" placeholder="输入消息..." rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
                     <div class="action-buttons">
                         <button class="action-btn" id="imageBtn" title="图片">📷<input type="file" accept="image/*" onchange="handleImage(this)" capture="environment"></button>
-                        <button class="action-btn" id="fileBtn" title="文件">📎<input type="file" id="file" style="display:none" onchange="handleFile(this)"></button>
+                        <button class="action-btn" id="fileBtn" title="文件">📎<input type="file" id="file" onchange="handleFile(this)"></button>
                         <button class="action-btn" id="voiceMsgBtn" title="按住说话" onmousedown="startVoiceRecording()" ontouchstart="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchend="stopVoiceRecording()" onmouseleave="cancelVoiceRecording()" disabled>🎤</button>
                     </div>
                     <button class="send-btn" id="sendBtn" onclick="sendText()" disabled>发送</button>
