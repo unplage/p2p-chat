@@ -152,7 +152,7 @@
                     <textarea class="msg-input" id="msgInput" placeholder="输入消息..." rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
                     <div class="action-buttons">
                         <button class="action-btn" id="imageBtn" title="图片">📷<input type="file" accept="image/*" onchange="handleImage(this)" capture="environment"></button>
-                        <button class="action-btn" id="fileBtn" title="文件">📎<input type="file" id="file" onchange="handleFile(this)"></button>
+                        <button class="action-btn" id="fileBtn" title="文件">📎<input type="file" id="file" multiple onchange="handleFile(this)"></button>
                         <button class="action-btn" id="voiceMsgBtn" title="按住说话" onmousedown="startVoiceRecording()" ontouchstart="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchend="stopVoiceRecording()" onmouseleave="cancelVoiceRecording()" disabled>🎤</button>
                     </div>
                     <button class="send-btn" id="sendBtn" onclick="sendText()" disabled>发送</button>
@@ -166,12 +166,12 @@
             <div class="vault-title">📤 发送文件</div>
             <div class="drop-zone" id="dropZone" onclick="document.getElementById('transferFile').click()">
                 <div class="drop-zone-text">点击或拖拽文件到这里</div>
-                <div class="drop-zone-hint">支持任意格式，最大 10GB<br>文件将端到端加密传输</div>
-                <input type="file" class="file-input" id="transferFile" onchange="handleTransferFile(this)">
+                <div class="drop-zone-hint">支持任意格式，最大 10GB<br>文件将端到端加密传输<br>支持多文件选择，自动排队发送</div>
+                <input type="file" class="file-input" id="transferFile" multiple onchange="handleTransferFile(this)">
             </div>
             <div id="sendProgress" class="hidden" style="margin-top:12px">
                 <div style="display:flex;justify-content:space-between;font-size:13px;color:#666;margin-bottom:4px">
-                    <span>传输中...</span>
+                    <span id="sendStatusText">传输中...</span>
                     <span id="sendPercent">0%</span>
                 </div>
                 <div class="file-progress"><div class="file-progress-bar" id="sendBar" style="width:0%"></div></div>
@@ -256,6 +256,10 @@ let fileTransferState = {
     receivedSize: 0
 };
 
+// 批量发送队列相关变量
+let fileQueue = [];            // 待发送文件队列
+let isFileSendingActive = false; // 是否正在发送队列中的文件
+
 const CHUNK_SIZE = 16384;
 const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
 
@@ -331,6 +335,9 @@ function cancelWaiting() {
     document.getElementById('callBtn').disabled = true;
     document.getElementById('voiceBtn').disabled = true;
     document.getElementById('voiceMsgBtn').disabled = true;
+    // 清空队列
+    fileQueue = [];
+    isFileSendingActive = false;
     resetRoomModal();
 }
 
@@ -425,7 +432,6 @@ function setupConnection(connection) {
                     conn.send(JSON.stringify({ type: 'pong' }));
                     break;
                 case 'pong':
-                    // 收到pong，清除超时定时器，重置失败计数
                     if (heartbeatTimeout) {
                         clearTimeout(heartbeatTimeout);
                         heartbeatTimeout = null;
@@ -448,6 +454,9 @@ function setupConnection(connection) {
         document.getElementById('callBtn').disabled = true;
         document.getElementById('voiceBtn').disabled = true;
         document.getElementById('voiceMsgBtn').disabled = true;
+        // 清空队列，停止发送
+        fileQueue = [];
+        isFileSendingActive = false;
 
         // 停止心跳
         if (heartbeatInterval) {
@@ -462,15 +471,13 @@ function setupConnection(connection) {
     conn.on('error', (err) => { addLog('数据连接错误: ' + err, 'error'); });
 }
 
-// ==================== 心跳检测（修复版）====================
+// ==================== 心跳检测 ====================
 function startHeartbeat() {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
     consecutiveFailures = 0;
     heartbeatInterval = setInterval(() => {
         if (conn && conn.open === true) {
-            // 发送ping
             conn.send(JSON.stringify({ type: 'ping' }));
-            // 设置超时检测
             heartbeatTimeout = setTimeout(() => {
                 consecutiveFailures++;
                 if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
@@ -512,10 +519,11 @@ function handleImage(input) {
     input.value = '';
 }
 
+// 文件选择入口（聊天模式）
 function handleFile(input) {
-    const file = input.files[0];
-    if (!file || !conn) { alert('请先建立连接'); return; }
-    sendFileViaP2P(file);
+    const files = input.files;
+    if (!files || files.length === 0) return;
+    addFilesToQueue(files);
     input.value = '';
 }
 
@@ -534,83 +542,148 @@ function compressImage(dataUrl, maxW, q) {
     });
 }
 
-// ==================== 文件传输核心 ====================
-function handleTransferFile(input) {
-    const file = input.files[0];
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) { alert('文件过大，最大支持 10GB'); return; }
-    if (!conn) { alert('请先建立连接'); return; }
-    sendFileViaP2P(file);
-    input.value = '';
+// ==================== 文件传输核心（支持队列）====================
+// 将文件加入队列
+function addFilesToQueue(files) {
+    if (!conn || conn.open !== true) {
+        addLog('❌ 连接未建立，无法发送文件', 'error');
+        return;
+    }
+    if (!files || files.length === 0) return;
+    
+    // 将文件转换为数组并加入队列
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > MAX_FILE_SIZE) {
+            addLog(`跳过文件 "${file.name}"：超过 10GB 限制`, 'warning');
+            continue;
+        }
+        fileQueue.push(file);
+    }
+    
+    // 启动队列处理（如果尚未启动）
+    if (!isFileSendingActive) {
+        processFileQueue();
+    } else {
+        addLog(`已添加 ${files.length} 个文件到队列，等待发送`, 'system');
+    }
+}
+
+// 处理队列中的文件
+async function processFileQueue() {
+    if (fileQueue.length === 0) {
+        isFileSendingActive = false;
+        // 恢复发送进度区域显示默认文本
+        const statusSpan = document.getElementById('sendStatusText');
+        if (statusSpan) statusSpan.textContent = '传输中...';
+        return;
+    }
+    
+    isFileSendingActive = true;
+    const file = fileQueue.shift();
+    
+    // 更新状态文本
+    const statusSpan = document.getElementById('sendStatusText');
+    if (statusSpan) {
+        statusSpan.textContent = `📤 发送: ${file.name} (剩余 ${fileQueue.length} 个)`;
+    }
+    addLog(`📤 正在发送: ${file.name} (剩余 ${fileQueue.length} 个文件)`, 'system');
+    
+    try {
+        await sendFileViaP2P(file);
+        // 发送成功，继续下一个
+        processFileQueue();
+    } catch (err) {
+        addLog(`发送 ${file.name} 失败，已跳过`, 'error');
+        // 即使失败也继续处理下一个
+        processFileQueue();
+    }
 }
 
 async function sendFileViaP2P(file) {
-    if (!conn) { alert('连接未建立'); return; }
-    fileTransferState.sending = true;
-    document.getElementById('sendProgress').classList.remove('hidden');
-    updateSendProgress(0);
-    
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    const fileInfo = { name: file.name, size: file.size, type: file.type, chunks: totalChunks };
-    console.log(`[发送] 开始发送文件 ${file.name}，共 ${totalChunks} 片`);
-    conn.send(JSON.stringify({ type: 'file-start', info: fileInfo }));
-    
-    const stream = file.stream();
-    const reader = stream.getReader();
-    let sentSize = 0;
-    let chunkIndex = 0;
-    
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const buffer = value.buffer || value;
-            for (let offset = 0; offset < buffer.byteLength; offset += CHUNK_SIZE) {
-                const chunkData = buffer.slice(offset, Math.min(offset + CHUNK_SIZE, buffer.byteLength));
-                const header = new ArrayBuffer(4);
-                new DataView(header).setUint32(0, chunkIndex, false);
-                const chunkWithSeq = new Uint8Array(header.byteLength + chunkData.byteLength);
-                chunkWithSeq.set(new Uint8Array(header), 0);
-                chunkWithSeq.set(new Uint8Array(chunkData), 4);
+    // 返回一个 Promise，让外部可以等待发送完成
+    return new Promise(async (resolve, reject) => {
+        if (!conn) {
+            reject(new Error('连接未建立'));
+            return;
+        }
+        if (fileTransferState.sending) {
+            reject(new Error('已有文件传输中，请稍后'));
+            return;
+        }
+        
+        fileTransferState.sending = true;
+        document.getElementById('sendProgress').classList.remove('hidden');
+        updateSendProgress(0);
+        
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        const fileInfo = { name: file.name, size: file.size, type: file.type, chunks: totalChunks };
+        console.log(`[发送] 开始发送文件 ${file.name}，共 ${totalChunks} 片`);
+        conn.send(JSON.stringify({ type: 'file-start', info: fileInfo }));
+        
+        const stream = file.stream();
+        const reader = stream.getReader();
+        let sentSize = 0;
+        let chunkIndex = 0;
+        
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
                 
-                let sent = false;
-                for (let retry = 0; retry < 3; retry++) {
-                    try {
-                        conn.send(chunkWithSeq.buffer);
-                        sent = true;
-                        break;
-                    } catch (e) {
-                        console.log(`[发送] 分片 ${chunkIndex} 发送失败，重试 ${retry+1}/3: ${e.message}`);
-                        await new Promise(r => setTimeout(r, 300));
+                const buffer = value.buffer || value;
+                for (let offset = 0; offset < buffer.byteLength; offset += CHUNK_SIZE) {
+                    const chunkData = buffer.slice(offset, Math.min(offset + CHUNK_SIZE, buffer.byteLength));
+                    const header = new ArrayBuffer(4);
+                    new DataView(header).setUint32(0, chunkIndex, false);
+                    const chunkWithSeq = new Uint8Array(header.byteLength + chunkData.byteLength);
+                    chunkWithSeq.set(new Uint8Array(header), 0);
+                    chunkWithSeq.set(new Uint8Array(chunkData), 4);
+                    
+                    let sent = false;
+                    for (let retry = 0; retry < 3; retry++) {
+                        try {
+                            conn.send(chunkWithSeq.buffer);
+                            sent = true;
+                            break;
+                        } catch (e) {
+                            console.log(`[发送] 分片 ${chunkIndex} 发送失败，重试 ${retry+1}/3: ${e.message}`);
+                            await new Promise(r => setTimeout(r, 300));
+                        }
+                    }
+                    if (!sent) {
+                        throw new Error('发送失败，重试耗尽');
+                    }
+                    
+                    sentSize += chunkData.byteLength;
+                    chunkIndex++;
+                    if (chunkIndex % 100 === 0) {
+                        const percent = Math.round((sentSize / file.size) * 100);
+                        console.log(`[发送] 已发送 ${chunkIndex}/${totalChunks} 片 (${percent}%)`);
+                        updateSendProgress(percent);
+                        conn.send(JSON.stringify({ type: 'file-progress', percent }));
                     }
                 }
-                if (!sent) {
-                    console.error(`[发送] 分片 ${chunkIndex} 发送失败，重试耗尽`);
-                    throw new Error('发送失败，重试耗尽');
-                }
-                
-                sentSize += chunkData.byteLength;
-                chunkIndex++;
-                if (chunkIndex % 100 === 0) {
-                    const percent = Math.round((sentSize / file.size) * 100);
-                    console.log(`[发送] 已发送 ${chunkIndex}/${totalChunks} 片 (${percent}%)`);
-                    updateSendProgress(percent);
-                    conn.send(JSON.stringify({ type: 'file-progress', percent }));
-                }
             }
+            console.log(`[发送] 所有分片发送完毕，共 ${chunkIndex} 片`);
+            conn.send(JSON.stringify({ type: 'file-end' }));
+            updateSendProgress(100);
+            addLog(`文件 "${file.name}" 发送完成`, 'success');
+            resolve();  // 成功完成
+        } catch (err) {
+            console.error('[发送] 发送过程中出错:', err);
+            addLog(`文件 "${file.name}" 发送失败: ${err.message}`, 'error');
+            reject(err); // 失败，让队列继续下一个（或停止）
+        } finally {
+            fileTransferState.sending = false;
+            setTimeout(() => { 
+                // 如果队列还有文件，不要立即隐藏进度条，由下一个文件发送时重新显示
+                if (fileQueue.length === 0) {
+                    document.getElementById('sendProgress').classList.add('hidden');
+                }
+            }, 2000);
         }
-        console.log(`[发送] 所有分片发送完毕，共 ${chunkIndex} 片`);
-        conn.send(JSON.stringify({ type: 'file-end' }));
-        updateSendProgress(100);
-        addLog(`文件 "${file.name}" 发送完成`, 'success');
-    } catch (err) { 
-        console.error('[发送] 发送过程中出错:', err);
-        addLog('发送失败: ' + err.message, 'error'); 
-    } finally {
-        fileTransferState.sending = false;
-        setTimeout(() => { document.getElementById('sendProgress').classList.add('hidden'); }, 2000);
-    }
+    });
 }
 
 // 接收文件开始
@@ -727,6 +800,14 @@ function escapeHTML(str) {
     });
 }
 
+// ==================== 文件中转模式文件处理 ====================
+function handleTransferFile(input) {
+    const files = input.files;
+    if (!files || files.length === 0) return;
+    addFilesToQueue(files);
+    input.value = '';
+}
+
 // ==================== 语音消息录制 ====================
 async function startVoiceRecording() {
     if (!conn || conn.open !== true) {
@@ -831,15 +912,14 @@ function addVoiceMsg(sender, base64Data, duration, type) {
     div.scrollIntoView({behavior:'smooth'});
 }
 
-// ==================== 自适应码率（修复版）====================
+// ==================== 自适应码率 ====================
 function startAdaptiveBitrate(pc) {
     if (pc._adaptationInterval) clearInterval(pc._adaptationInterval);
     
-    // 初始化 pc 上的状态变量
     pc._smoothBandwidth = null;
     pc._lastAdjustTime = 0;
     const ALPHA = 0.3;
-    const ADJUST_COOLDOWN = 6000; // 6秒
+    const ADJUST_COOLDOWN = 6000;
 
     pc._adaptationInterval = setInterval(async () => {
         if (!pc || pc.connectionState !== 'connected' || !isInCall) {
@@ -854,20 +934,16 @@ function startAdaptiveBitrate(pc) {
         try {
             const stats = await pc.getStats();
             let bandwidth = null;
-
-            // 兼容获取带宽
             stats.forEach(report => {
                 if (report.type === 'candidate-pair' && report.state === 'succeeded') {
                     if (report.availableOutgoingBitrate) {
                         bandwidth = report.availableOutgoingBitrate;
                     }
-                    // Firefox 可能使用其他字段，暂不处理
                 }
             });
 
-            if (!bandwidth) return; // 无带宽信息时不调整
+            if (!bandwidth) return;
 
-            // 平滑处理
             if (pc._smoothBandwidth === null) {
                 pc._smoothBandwidth = bandwidth;
             } else {
@@ -898,7 +974,6 @@ function startAdaptiveBitrate(pc) {
                 scaleDownBy = 1.0;
             }
 
-            // 只有变化显著时才更新
             if (params.encodings[0].maxBitrate !== maxBitrate || params.encodings[0].scaleResolutionDownBy !== scaleDownBy) {
                 params.encodings[0].maxBitrate = maxBitrate;
                 params.encodings[0].scaleResolutionDownBy = scaleDownBy;
@@ -913,7 +988,7 @@ function startAdaptiveBitrate(pc) {
     }, ADJUST_COOLDOWN);
 }
 
-// ==================== 音视频通话（优化版）====================
+// ==================== 音视频通话 ====================
 async function startCall(type) {
     if (!conn || !peer) { addLog('❌ 请先建立数据连接', 'error'); return alert('请先建立连接'); }
     if (conn.open !== true) { addLog('❌ 数据连接未就绪', 'error'); return alert('数据通道未完全打开'); }
@@ -921,7 +996,6 @@ async function startCall(type) {
     document.getElementById('callBtn').disabled = true;
     document.getElementById('voiceBtn').disabled = true;
     try {
-        // 增强的媒体约束
         const constraints = type === 'video' 
             ? {
                 video: {
@@ -956,11 +1030,10 @@ async function startCall(type) {
         
         currentCall = call;
         
-        // 获取底层 RTCPeerConnection
         const pc = call._pc || call.peerConnection;
         if (pc) {
             pc._call = call;
-            pc._isRestartingIce = false; // 标志位，防止多次重启
+            pc._isRestartingIce = false;
 
             pc.oniceconnectionstatechange = () => {
                 const state = pc.iceConnectionState;
@@ -973,7 +1046,6 @@ async function startCall(type) {
                     clearTimeout(window.iceDisconnectTimer);
                     try {
                         pc.restartIce();
-                        // 5秒后重置标志（若重启成功，状态会变，未变则允许再次尝试）
                         setTimeout(() => { pc._isRestartingIce = false; }, 5000);
                     } catch (e) {
                         console.error('restartIce 失败:', e);
@@ -1005,7 +1077,6 @@ async function startCall(type) {
                 }
             };
 
-            // 启动自适应码率
             startAdaptiveBitrate(pc);
         }
 
@@ -1028,7 +1099,6 @@ async function startCall(type) {
         document.getElementById('callOverlay').classList.add('active');
         addMsg('系统', type === 'video' ? '📹 视频通话发起中...' : '📞 语音通话发起中...', 'system');
 
-        // 请求屏幕唤醒锁
         if ('wakeLock' in navigator) {
             try {
                 wakeLock = await navigator.wakeLock.request('screen');
@@ -1050,7 +1120,6 @@ async function startCall(type) {
     }
 }
 
-// 处理来电（接收方）同样应用优化
 function handleIncomingCall(call) {
     if (isInCall) {
         addLog('⚠️ 已有一个通话，拒绝新来电', 'warning');
@@ -1132,7 +1201,6 @@ function handleIncomingCall(call) {
                     }
                 };
 
-                // 启动自适应码率
                 startAdaptiveBitrate(pc);
             }
             
@@ -1187,7 +1255,6 @@ function cleanupCall() {
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('callOverlay').classList.remove('active');
     
-    // 清理与当前通话相关的定时器和标志
     if (currentCall) {
         const pc = currentCall._pc || currentCall.peerConnection;
         if (pc) {
@@ -1204,7 +1271,6 @@ function cleanupCall() {
     document.getElementById('callBtn').disabled = false;
     document.getElementById('voiceBtn').disabled = false;
 
-    // 释放唤醒锁
     if (wakeLock) {
         wakeLock.release();
         wakeLock = null;
@@ -1261,11 +1327,13 @@ if (dropZone) {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         const files = e.dataTransfer.files;
-        if (files.length) handleTransferFile({ files: [files[0]] });
+        if (files.length) {
+            addFilesToQueue(files);
+        }
     });
 }
 
-function init() { console.log('P2P 房间直连版（最终修复版）已初始化'); }
+function init() { console.log('P2P 房间直连版（批量文件发送增强版）已初始化'); }
 init();
 </script>
 </body>
