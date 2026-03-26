@@ -1,7 +1,7 @@
 {
     "name": "点对点加密通话- 安全的通话机制",
     "short_name": "P2PChat",
-    "description": "一个功能强大的背单词 PWA 应用",
+    "description": "一个功能强大的加密通讯以及文件传输 PWA 应用",
     "start_url": "/p2p-chat/",
     "display": "standalone",
     "background_color": "#f5f5f5",
