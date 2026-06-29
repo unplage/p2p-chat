@@ -296,9 +296,9 @@ let wakeLock = null;
 let heartbeatInterval = null;
 let heartbeatTimeout = null;
 let consecutiveFailures = 0;
-const HEARTBEAT_INTERVAL = 15000;       // 每 15s 发送一次 ping
-const HEARTBEAT_TIMEOUT = 30000;        // 等待 pong 超时 30s
-const MAX_CONSECUTIVE_FAILURES = 3;     // 连续 3 次超时（约 45s）判定死链
+const HEARTBEAT_INTERVAL = 60000;       // 每 15s 发送一次 ping
+const HEARTBEAT_TIMEOUT = 7200000;        // 等待 pong 超时 30s
+const MAX_CONSECUTIVE_FAILURES = 6;     // 连续 3 次超时（约 45s）判定死链
 
 // ==================== 日志系统 ====================
 function addLog(msg, type='system') {
@@ -1929,7 +1929,7 @@ init();
 <script>
   if ('serviceWorker' in navigator) {
     // 注意：如果站点在子目录（如 /project/），注册路径需要包含子目录前缀
-    // 一般使用相对路径 './sv.js' 或绝对路径 '/project/sv.js'
+    // 一般使用相对路径 './sw.js' 或绝对路径 '/project/sw.js'
     navigator.serviceWorker.register('./sw.js').then(reg => {
       console.log('Service Worker 注册成功，作用域:', reg.scope);
     }).catch(err => {
