@@ -53,13 +53,13 @@
         .drop-zone-text { color:#666; font-size:14px; margin-bottom:12px; }
         .drop-zone-hint { color:#999; font-size:12px; }
         .file-input { display:none; }
-        .file-list { margin-top:16px; display:flex; flex-direction:column; gap:8px; }
-        .file-item { display:flex; align-items:center; padding:12px; background:#f8f8f8; border-radius:8px; }
+        .file-list { margin-top:16px; }
+        .file-item { display:flex; align-items:center; padding:12px; background:#f8f8f8; border-radius:8px; margin-bottom:8px; }
         .file-item-icon { width:32px; height:32px; background:white; border-radius:6px; display:flex; align-items:center; justify-content:center; margin-right:12px; }
-        .file-item-info { flex:1; min-width: 0; }
-        .file-item-name { font-size:14px; color:#333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-item-info { flex:1; }
+        .file-item-name { font-size:14px; color:#333; }
         .file-item-meta { font-size:12px; color:#999; margin-top:2px; }
-        .file-item-action { padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer; flex-shrink: 0; margin-left: 8px; }
+        .file-item-action { padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer; }
         .file-item-action:disabled { background:#ccc; }
         .system-msg { align-self:center; background:rgba(0,0,0,0.05); color:#666; padding:6px 12px; border-radius:12px; font-size:12px; max-width:90%; text-align:center; }
         .system-msg.error { background:#fff2f0; color:var(--danger); border:1px solid #ffccc7; }
@@ -135,8 +135,8 @@
     </div>
 
     <div class="mode-switch" id="modeSwitch" style="display:none">
-        <button class="mode-btn active" onclick="switchMode('chat', this)">💬 加密聊天</button>
-        <button class="mode-btn" onclick="switchMode('transfer', this)">📦 文件中转</button>
+        <button class="mode-btn active" onclick="switchMode('chat')">💬 加密聊天</button>
+        <button class="mode-btn" onclick="switchMode('transfer')">📦 文件中转</button>
     </div>
 
     <div class="content" id="chatMode">
@@ -178,7 +178,7 @@
             </div>
         </div>
         <div class="vault-card hidden" id="receivingCard">
-            <div class="vault-title">📥 正在接收 / 已接收</div>
+            <div class="vault-title">📥 正在接收</div>
             <div class="file-list" id="receivingList"></div>
         </div>
     </div>
@@ -188,11 +188,8 @@
     <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
     <div class="local-pip"><video id="localVideo" autoplay playsinline muted></video></div>
     <div class="call-controls">
-        <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="muteBtn" onclick="toggleMute()" title="麦克风">🎤</button>
-        <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="cameraBtn" onclick="toggleCamera()" title="摄像头" hidden>🎥</button>
-        <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="switchCamBtn" onclick="switchCamera()" title="切换摄像头" hidden>🔄</button>
-        <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="speakerBtn" onclick="toggleSpeaker()" title="扬声器" hidden>🔊</button>
-        <button class="call-btn hangup" onclick="hangup()" title="挂断">📞</button>
+        <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="muteBtn" onclick="toggleMute()">🎤</button>
+        <button class="call-btn hangup" onclick="hangup()">📞</button>
     </div>
 </div>
 
@@ -237,13 +234,8 @@ const peerOptions = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun.cloudflare.com:3478' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-        ],
-        iceCandidatePoolSize: 10
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
+        ]
     }
 };
 
@@ -254,51 +246,45 @@ let localStream = null;
 let isConnected = false;
 let isInCall = false;
 let currentCall = null;
-let pendingCallType = null;  
-let currentCallType = null;  
-let currentFacingMode = 'user';  
-let audioOutputDevices = [];  
-let currentAudioOutputIndex = 0;
 let currentMode = 'chat';
-
-// 文件传输状态（支持多文件队列串行处理）
 let fileTransferState = {
     sending: false,
     receiving: false,
     fileInfo: null,
+    receivedChunks: [],
     receivedCount: 0,
-    receivedSize: 0,
-    receivedBitmap: null,
-    pendingWrites: [],
-    flushTimer: null
+    receivedSize: 0
 };
 
-let fileQueue = [];            // 发送文件队列
-let isFileSendingActive = false; // 是否正在发送
-
-let receiveQueue = [];         // 接收文件队列
-let currentReceiveFile = null; // 当前接收的文件信息
+// 批量发送队列相关变量
+let fileQueue = [];            // 待发送文件队列
+let isFileSendingActive = false; // 是否正在发送队列中的文件
 
 const CHUNK_SIZE = 16384;
 const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
 
+// UI节流变量
 let lastUIUpdate = 0;
-const UI_UPDATE_INTERVAL = 100;
+const UI_UPDATE_INTERVAL = 100; // 毫秒
 
+// 语音录制相关变量
 let mediaRecorder = null;
 let audioChunks = [];
 let recordingTimer = null;
 let recordingStartTime = 0;
 
+// 屏幕唤醒锁
 let wakeLock = null;
 
+// ==================== 心跳检测相关 ====================
 let heartbeatInterval = null;
 let heartbeatTimeout = null;
 let consecutiveFailures = 0;
-const HEARTBEAT_INTERVAL = 60000;       
-const HEARTBEAT_TIMEOUT = 7200000;        
-const MAX_CONSECUTIVE_FAILURES = 6;     
+const HEARTBEAT_INTERVAL = 60000; // 10秒发送一次ping
+const HEARTBEAT_TIMEOUT = 7200000;    // 等待pong超时5秒
+const MAX_CONSECUTIVE_FAILURES = 6;
 
+// ==================== 日志系统 ====================
 function addLog(msg, type='system') {
     console.log(msg);
     const messages = document.getElementById('messages');
@@ -312,10 +298,10 @@ function addLog(msg, type='system') {
 }
 
 // ==================== UI 控制 ====================
-function switchMode(mode, btn) {
+function switchMode(mode) {
     currentMode = mode;
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
+    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
     if (mode === 'chat') {
         document.getElementById('chatMode').style.display = 'block';
         document.getElementById('transferMode').classList.remove('active');
@@ -349,10 +335,9 @@ function cancelWaiting() {
     document.getElementById('callBtn').disabled = true;
     document.getElementById('voiceBtn').disabled = true;
     document.getElementById('voiceMsgBtn').disabled = true;
+    // 清空队列
     fileQueue = [];
     isFileSendingActive = false;
-    receiveQueue = [];
-    currentReceiveFile = null;
     resetRoomModal();
 }
 
@@ -413,17 +398,8 @@ function setupConnection(connection) {
         document.getElementById('waitingView').classList.add('hidden');
         document.getElementById('successView').classList.remove('hidden');
 
+        // 启动心跳检测
         startHeartbeat();
-        resumeIncompleteTransfers();
-
-        if (currentSendFile && currentSendInfo) {
-            sendFileStartTimer = setTimeout(() => {
-                sendFileStartTimer = null;
-                if (currentSendFile && currentSendInfo && conn && conn.open === true) {
-                    try { conn.send(JSON.stringify({ type: 'file-start', info: currentSendInfo })); } catch (e) {}
-                }
-            }, 1000);
-        }
     });
 
     conn.on('data', (data) => {
@@ -431,7 +407,7 @@ function setupConnection(connection) {
         if (data instanceof ArrayBuffer) {
             buffer = data;
         } else if (ArrayBuffer.isView(data)) {
-            buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+            buffer = data.buffer;
         } else if (data && typeof data === 'object' && data.byteLength !== undefined) {
             buffer = data;
         }
@@ -446,18 +422,23 @@ function setupConnection(connection) {
             switch (msg.type) {
                 case 'text': addMsg('对方', msg.content, 'received'); break;
                 case 'image': addImg('对方', msg.content, 'received'); break;
-                case 'voice': addVoiceMsg('对方', msg.data, msg.duration, 'received'); break;
-                case 'call-request': pendingCallType = msg.callType || 'video'; break;
+                case 'voice':
+                    addVoiceMsg('对方', msg.data, msg.duration, 'received');
+                    break;
                 case 'file-start': handleFileStart(msg.info); break;
-                case 'file-complete-ack': handleFileCompleteAck(msg.id); break;
-                case 'file-cancel': handleFileCancel(msg.id); break;
-                case 'file-resume-request': handleFileResumeRequest(msg.id, msg.bitmap, msg.total); break;
-                case 'file-end': break;
-                case 'ping': conn.send(JSON.stringify({ type: 'pong' })); break;
+                case 'file-progress': updateSendProgress(msg.percent); break;
+                case 'file-end': /* 备用 */ break;
+                case 'ping':
+                    conn.send(JSON.stringify({ type: 'pong' }));
+                    break;
                 case 'pong':
-                    if (heartbeatTimeout) { clearTimeout(heartbeatTimeout); heartbeatTimeout = null; }
+                    if (heartbeatTimeout) {
+                        clearTimeout(heartbeatTimeout);
+                        heartbeatTimeout = null;
+                    }
                     consecutiveFailures = 0;
                     break;
+                default: console.log('未知消息类型', msg);
             }
         } catch (e) {
             console.error('消息解析失败', e);
@@ -473,28 +454,21 @@ function setupConnection(connection) {
         document.getElementById('callBtn').disabled = true;
         document.getElementById('voiceBtn').disabled = true;
         document.getElementById('voiceMsgBtn').disabled = true;
-
+        // 清空队列，停止发送
         fileQueue = [];
         isFileSendingActive = false;
-        receiveQueue = [];
-        currentReceiveFile = null;
 
-        if (fileTransferState.flushTimer) { clearTimeout(fileTransferState.flushTimer); fileTransferState.flushTimer = null; }
-        fileTransferState.receiving = false;
-        fileTransferState.pendingWrites = [];
-        fileTransferState.fileInfo = null;
-
-        if (currentSendReject) { currentSendReject(new Error('连接已关闭')); }
-        cleanupSendState();
-
-        if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
-        if (heartbeatTimeout) { clearTimeout(heartbeatTimeout); heartbeatTimeout = null; }
+        // 停止心跳
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        }
+        if (heartbeatTimeout) {
+            clearTimeout(heartbeatTimeout);
+            heartbeatTimeout = null;
+        }
     });
-    
-    conn.on('error', (err) => { 
-        addLog('数据连接错误: ' + err, 'error');
-        if (currentSendReject) { currentSendReject(err); cleanupSendState(); }
-    });
+    conn.on('error', (err) => { addLog('数据连接错误: ' + err, 'error'); });
 }
 
 // ==================== 心跳检测 ====================
@@ -508,7 +482,7 @@ function startHeartbeat() {
                 consecutiveFailures++;
                 if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                     addLog('❤️‍🩹 心跳连续超时，连接断开', 'error');
-                    if (conn) conn.close();
+                    conn.close();
                 } else {
                     addLog(`心跳超时 (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`, 'warning');
                 }
@@ -545,6 +519,7 @@ function handleImage(input) {
     input.value = '';
 }
 
+// 文件选择入口（聊天模式）
 function handleFile(input) {
     const files = input.files;
     if (!files || files.length === 0) return;
@@ -567,118 +542,8 @@ function compressImage(dataUrl, maxW, q) {
     });
 }
 
-// ==================== IndexedDB 文件溢出缓冲 ====================
-const IDB_DB_NAME = 'p2p-file-cache';
-const IDB_VERSION = 1;
-let idbFileDb = null;
-
-function idbOpen() {
-    return new Promise((resolve, reject) => {
-        if (idbFileDb) return resolve(idbFileDb);
-        const req = indexedDB.open(IDB_DB_NAME, IDB_VERSION);
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('chunks')) {
-                db.createObjectStore('chunks', { keyPath: ['transferId', 'seq'] });
-            }
-            if (!db.objectStoreNames.contains('meta')) {
-                db.createObjectStore('meta', { keyPath: 'id' });
-            }
-        };
-        req.onsuccess = (e) => { idbFileDb = e.target.result; resolve(idbFileDb); };
-        req.onerror = (e) => reject(e.target.error);
-    });
-}
-
-function idbPutChunks(transferId, chunks) {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('chunks', 'readwrite');
-        const store = tx.objectStore('chunks');
-        for (const c of chunks) { store.put({ transferId, seq: c.seq, data: c.data }); }
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    }));
-}
-
-function idbIterateChunks(transferId, cb) {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('chunks', 'readonly');
-        const range = IDBKeyRange.bound([transferId, 0], [transferId, 0xFFFFFFFF]);
-        const req = tx.objectStore('chunks').openCursor(range);
-        req.onsuccess = async () => {
-            const cursor = req.result;
-            if (cursor) {
-                try { await cb(cursor.value.data, cursor.value.seq); } catch (e) { reject(e); return; }
-                cursor.continue();
-            } else { resolve(); }
-        };
-        req.onerror = () => reject(req.error);
-    }));
-}
-
-function idbPutMeta(meta) {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('meta', 'readwrite');
-        tx.objectStore('meta').put(meta);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    }));
-}
-
-function idbGetMeta(id) {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('meta', 'readonly');
-        const req = tx.objectStore('meta').get(id);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-    }));
-}
-
-function idbClearTransfer(id) {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction(['chunks', 'meta'], 'readwrite');
-        const chunkRange = IDBKeyRange.bound([id, 0], [id, 0xFFFFFFFF]);
-        tx.objectStore('chunks').delete(chunkRange);
-        tx.objectStore('meta').delete(id);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    }));
-}
-
-function idbGetIncompleteTransfers() {
-    return idbOpen().then(db => new Promise((resolve, reject) => {
-        const tx = db.transaction('meta', 'readonly');
-        const req = tx.objectStore('meta').openCursor();
-        const result = [];
-        req.onsuccess = () => {
-            const cursor = req.result;
-            if (cursor) {
-                if (cursor.value.status !== 'done') result.push(cursor.value);
-                cursor.continue();
-            } else { resolve(result); }
-        };
-        req.onerror = () => reject(req.error);
-    }));
-}
-
-async function resumeIncompleteTransfers() {
-    try {
-        const incomplete = await idbGetIncompleteTransfers();
-        for (const meta of incomplete) {
-            if (currentReceiveFile && currentReceiveFile.id === meta.id) continue;
-            console.log(`[接收] 检测到未完成 transfer ${meta.name}，加入恢复队列`);
-            receiveQueue.push(meta);
-        }
-        if (!fileTransferState.receiving && receiveQueue.length > 0) {
-            const next = receiveQueue.shift();
-            startReceivingFile(next);
-        }
-    } catch (e) {
-        console.warn('续传扫描失败', e);
-    }
-}
-
-// ==================== 文件发送队列 ====================
+// ==================== 文件传输核心（支持队列）====================
+// 将文件加入队列
 function addFilesToQueue(files) {
     if (!conn || conn.open !== true) {
         addLog('❌ 连接未建立，无法发送文件', 'error');
@@ -686,6 +551,7 @@ function addFilesToQueue(files) {
     }
     if (!files || files.length === 0) return;
     
+    // 将文件转换为数组并加入队列
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.size > MAX_FILE_SIZE) {
@@ -695,6 +561,7 @@ function addFilesToQueue(files) {
         fileQueue.push(file);
     }
     
+    // 启动队列处理（如果尚未启动）
     if (!isFileSendingActive) {
         processFileQueue();
     } else {
@@ -702,465 +569,200 @@ function addFilesToQueue(files) {
     }
 }
 
+// 处理队列中的文件
 async function processFileQueue() {
     if (fileQueue.length === 0) {
         isFileSendingActive = false;
+        // 恢复发送进度区域显示默认文本
         const statusSpan = document.getElementById('sendStatusText');
-        if (statusSpan) statusSpan.textContent = '全部传输完成';
+        if (statusSpan) statusSpan.textContent = '传输中...';
         return;
     }
-
+    
     isFileSendingActive = true;
     const file = fileQueue.shift();
-
+    
+    // 更新状态文本
     const statusSpan = document.getElementById('sendStatusText');
     if (statusSpan) {
         statusSpan.textContent = `📤 发送: ${file.name} (剩余 ${fileQueue.length} 个)`;
     }
     addLog(`📤 正在发送: ${file.name} (剩余 ${fileQueue.length} 个文件)`, 'system');
-
+    
     try {
         await sendFileViaP2P(file);
-        // 发送成功后自动进入下一个
+        // 发送成功，继续下一个
         processFileQueue();
     } catch (err) {
-        addLog(`发送 ${file.name} 失败，已跳过: ${err.message}`, 'error');
+        addLog(`发送 ${file.name} 失败，已跳过`, 'error');
+        // 即使失败也继续处理下一个
         processFileQueue();
     }
 }
 
-// ==================== 发送端状态 ====================
-let currentSendFile = null;       
-let currentSendInfo = null;       
-let currentSendResolve = null;
-let currentSendReject = null;
-let sendFileStartTimer = null;    
-
-// ==================== bitmap / base64 辅助 ====================
-function bitmapGet(bm, i) { return (bm[i >> 3] >> (7 - (i & 7))) & 1; }
-function bitmapSet(bm, i) { bm[i >> 3] |= 1 << (7 - (i & 7)); }
-function bitmapAnySet(bm, total) {
-    const fullBytes = total >> 3;
-    for (let i = 0; i < fullBytes; i++) if (bm[i] !== 0) return true;
-    if (total & 7) {
-        const last = bm[fullBytes];
-        const mask = (1 << (8 - (total & 7))) - 1;  
-        if ((last & ~mask) !== 0) return true;
-    }
-    return false;
-}
-function u8ToBase64(u8) {
-    let s = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < u8.length; i += chunk) {
-        s += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
-    }
-    return btoa(s);
-}
-function base64ToU8(b64) {
-    const s = atob(b64);
-    const u8 = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
-    return u8;
-}
-
-function readSlice(file, start, end) {
-    const blob = file.slice(start, end);
-    if (blob.arrayBuffer) return blob.arrayBuffer();
-    return new Promise((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(fr.result);
-        fr.onerror = () => reject(fr.error);
-        fr.readAsArrayBuffer(blob);
-    });
-}
-
-// ==================== 发送端核心 ====================
-function sendFileViaP2P(file) {
+async function sendFileViaP2P(file) {
+    // 返回一个 Promise，让外部可以等待发送完成
     return new Promise(async (resolve, reject) => {
-        if (!conn) { reject(new Error('连接未建立')); return; }
-        if (fileTransferState.sending) { reject(new Error('已有文件传输中，请稍后')); return; }
-
+        if (!conn) {
+            reject(new Error('连接未建立'));
+            return;
+        }
+        if (fileTransferState.sending) {
+            reject(new Error('已有文件传输中，请稍后'));
+            return;
+        }
+        
         fileTransferState.sending = true;
-        currentSendFile = file;
-        currentSendResolve = resolve;
-        currentSendReject = reject;
         document.getElementById('sendProgress').classList.remove('hidden');
         updateSendProgress(0);
-
+        
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-        const transferId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2)));
-        const fileInfo = { id: transferId, name: file.name, size: file.size, type: file.type, chunks: totalChunks };
-        currentSendInfo = fileInfo;
+        const fileInfo = { name: file.name, size: file.size, type: file.type, chunks: totalChunks };
+        console.log(`[发送] 开始发送文件 ${file.name}，共 ${totalChunks} 片`);
+        conn.send(JSON.stringify({ type: 'file-start', info: fileInfo }));
+        
+        const stream = file.stream();
+        const reader = stream.getReader();
+        let sentSize = 0;
+        let chunkIndex = 0;
         
         try {
-            conn.send(JSON.stringify({ type: 'file-start', info: fileInfo }));
-        } catch (e) {
-            console.warn('file-start 发送失败，等待重连后重发', e);
-        }
-    });
-}
-
-async function waitForDrain() {
-    if (!conn || !conn.dataChannel) return;
-    const dc = conn.dataChannel;
-    const HIGH = 16 * 1024 * 1024;
-    const LOW = 4 * 1024 * 1024;
-    if (dc.bufferedAmount < HIGH) return;
-    dc.bufferedAmountLowThreshold = LOW;
-    await new Promise(res => {
-        const handler = () => { dc.removeEventListener('bufferedamountlow', handler); res(); };
-        dc.addEventListener('bufferedamountlow', handler);
-    });
-}
-
-async function streamSendAllChunks(file, totalChunks) {
-    const stream = file.stream();
-    const reader = stream.getReader();
-    let sentSize = 0;
-    let chunkIndex = 0;
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const buffer = value.buffer || value;
-            for (let offset = 0; offset < buffer.byteLength; offset += CHUNK_SIZE) {
-                const chunkData = buffer.slice(offset, Math.min(offset + CHUNK_SIZE, buffer.byteLength));
-                await sendChunkSeq(chunkIndex, chunkData);
-                sentSize += chunkData.byteLength;
-                chunkIndex++;
-                if (chunkIndex % 100 === 0) {
-                    updateSendProgress(Math.round((sentSize / file.size) * 100));
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const buffer = value.buffer || value;
+                for (let offset = 0; offset < buffer.byteLength; offset += CHUNK_SIZE) {
+                    const chunkData = buffer.slice(offset, Math.min(offset + CHUNK_SIZE, buffer.byteLength));
+                    const header = new ArrayBuffer(4);
+                    new DataView(header).setUint32(0, chunkIndex, false);
+                    const chunkWithSeq = new Uint8Array(header.byteLength + chunkData.byteLength);
+                    chunkWithSeq.set(new Uint8Array(header), 0);
+                    chunkWithSeq.set(new Uint8Array(chunkData), 4);
+                    
+                    let sent = false;
+                    for (let retry = 0; retry < 3; retry++) {
+                        try {
+                            conn.send(chunkWithSeq.buffer);
+                            sent = true;
+                            break;
+                        } catch (e) {
+                            console.log(`[发送] 分片 ${chunkIndex} 发送失败，重试 ${retry+1}/3: ${e.message}`);
+                            await new Promise(r => setTimeout(r, 300));
+                        }
+                    }
+                    if (!sent) {
+                        throw new Error('发送失败，重试耗尽');
+                    }
+                    
+                    sentSize += chunkData.byteLength;
+                    chunkIndex++;
+                    if (chunkIndex % 100 === 0) {
+                        const percent = Math.round((sentSize / file.size) * 100);
+                        console.log(`[发送] 已发送 ${chunkIndex}/${totalChunks} 片 (${percent}%)`);
+                        updateSendProgress(percent);
+                        conn.send(JSON.stringify({ type: 'file-progress', percent }));
+                    }
                 }
             }
+            console.log(`[发送] 所有分片发送完毕，共 ${chunkIndex} 片`);
+            conn.send(JSON.stringify({ type: 'file-end' }));
+            updateSendProgress(100);
+            addLog(`文件 "${file.name}" 发送完成`, 'success');
+            resolve();  // 成功完成
+        } catch (err) {
+            console.error('[发送] 发送过程中出错:', err);
+            addLog(`文件 "${file.name}" 发送失败: ${err.message}`, 'error');
+            reject(err); // 失败，让队列继续下一个（或停止）
+        } finally {
+            fileTransferState.sending = false;
+            setTimeout(() => { 
+                // 如果队列还有文件，不要立即隐藏进度条，由下一个文件发送时重新显示
+                if (fileQueue.length === 0) {
+                    document.getElementById('sendProgress').classList.add('hidden');
+                }
+            }, 2000);
         }
-    } catch (err) {
-        console.warn('[发送] 流式发送中断:', err.message);
-    }
+    });
 }
 
-async function sendMissingChunks(file, bitmap, total) {
-    let sent = 0;
-    for (let seq = 0; seq < total; seq++) {
-        if (bitmapGet(bitmap, seq)) continue;
-        const start = seq * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunkData = await readSlice(file, start, end);
-        await sendChunkSeq(seq, chunkData);
-        sent++;
-        if (sent % 100 === 0) updateSendProgress(Math.round((seq / total) * 100));
-    }
-}
-
-async function sendChunkSeq(seq, chunkData) {
-    const header = new ArrayBuffer(4);
-    new DataView(header).setUint32(0, seq, false);
-    const chunkWithSeq = new Uint8Array(header.byteLength + chunkData.byteLength);
-    chunkWithSeq.set(new Uint8Array(header), 0);
-    chunkWithSeq.set(new Uint8Array(chunkData), 4);
-
-    await waitForDrain();
-    for (let retry = 0; retry < 3; retry++) {
-        try {
-            conn.send(chunkWithSeq.buffer);
-            return true;
-        } catch (e) {
-            await new Promise(r => setTimeout(r, 300));
-        }
-    }
-    return false;
-}
-
-function handleFileCompleteAck(id) {
-    if (currentSendInfo && currentSendInfo.id === id) {
-        console.log(`[发送] 收到 ack ${id}，文件完成`);
-        addLog(`文件 "${currentSendInfo.name}" 发送完成`, 'success');
-        const resolve = currentSendResolve;
-        cleanupSendState();
-        if (resolve) resolve(); // 触发 processFileQueue 继续下一个
-    }
-}
-
-function handleFileCancel(id) {
-    if (currentSendInfo && currentSendInfo.id === id) {
-        addLog(`文件 "${currentSendInfo.name}" 被对方取消`, 'warning');
-        const reject = currentSendReject;
-        cleanupSendState();
-        if (reject) reject(new Error('对方取消接收')); // 触发 processFileQueue 继续下一个
-    }
-}
-
-async function handleFileResumeRequest(id, bitmapB64, total) {
-    if (!currentSendInfo || currentSendInfo.id !== id || !currentSendFile) {
-        try { conn.send(JSON.stringify({ type: 'file-cancel', id })); } catch (e) {}
-        return;
-    }
-    if (sendFileStartTimer) { clearTimeout(sendFileStartTimer); sendFileStartTimer = null; }
-
-    const file = currentSendFile;
-    const bitmap = base64ToU8(bitmapB64);
-    addLog(`🔄 续传 "${currentSendInfo.name}"，扫描缺失分片...`, 'system');
-
-    if (!bitmapAnySet(bitmap, total)) {
-        await streamSendAllChunks(file, total);
-    } else {
-        await sendMissingChunks(file, bitmap, total);
-    }
-    try { conn.send(JSON.stringify({ type: 'file-end' })); } catch (e) {}
-    updateSendProgress(100);
-}
-
-function cleanupSendState() {
-    fileTransferState.sending = false;
-    currentSendFile = null;
-    currentSendInfo = null;
-    currentSendResolve = null;
-    currentSendReject = null;
-    if (sendFileStartTimer) { clearTimeout(sendFileStartTimer); sendFileStartTimer = null; }
-    setTimeout(() => {
-        if (fileQueue.length === 0) {
-            const sp = document.getElementById('sendProgress');
-            if (sp) sp.classList.add('hidden');
-        }
-    }, 2000);
-}
-
-// ==================== 接收端核心 ====================
-async function handleFileStart(info) {
-    // 如果正在接收其他文件，将新文件加入队列
-    if (fileTransferState.receiving && currentReceiveFile && currentReceiveFile.id !== info.id) {
-        console.log(`[接收] 文件 ${info.name} 加入队列，等待当前文件接收完成`);
-        if (!receiveQueue.some(f => f.id === info.id)) {
-            receiveQueue.push(info);
-        }
-        return;
-    }
-    
-    // 如果没有正在接收的文件，直接开始接收
-    if (!fileTransferState.receiving) {
-        startReceivingFile(info);
-    }
-}
-
-async function startReceivingFile(info) {
-    let meta = null;
-    try { meta = await idbGetMeta(info.id); } catch (e) { console.warn('idbGetMeta 失败', e); }
-
-    if (meta && meta.status === 'done') {
-        console.log(`[接收] ${info.name} 已完成，补发 ack`);
-        try { conn.send(JSON.stringify({ type: 'file-complete-ack', id: info.id })); } catch (e) {}
-        return;
-    }
-
-    if (meta && meta.status === 'receiving') {
-        console.log(`[接收] ${info.name} 已有部分数据，发续传请求`);
-        fileTransferState.receiving = true;
-        fileTransferState.fileInfo = info;
-        currentReceiveFile = info;
-        fileTransferState.receivedCount = meta.receivedCount;
-        fileTransferState.receivedBitmap = null;  
-        fileTransferState.pendingWrites = [];
-        if (fileTransferState.flushTimer) { clearTimeout(fileTransferState.flushTimer); fileTransferState.flushTimer = null; }
-        lastUIUpdate = 0;
-        showReceivingFile(info);
-        fileTransferState.receivedBitmap = await buildBitmapFromIdb(info.id, info.chunks);
-        await sendResumeRequest(info.id, info.chunks);
-        return;
-    }
-
-    // 全新接收
+// 接收文件开始
+function handleFileStart(info) {
     console.log(`[接收] 开始接收文件: ${info.name}，共 ${info.chunks} 片`);
     fileTransferState.receiving = true;
     fileTransferState.fileInfo = info;
-    currentReceiveFile = info;
+    fileTransferState.receivedChunks = new Array(info.chunks);
     fileTransferState.receivedCount = 0;
     fileTransferState.receivedSize = 0;
-    fileTransferState.receivedBitmap = new Uint8Array(Math.ceil(info.chunks / 8));
-    fileTransferState.pendingWrites = [];
-    if (fileTransferState.flushTimer) { clearTimeout(fileTransferState.flushTimer); fileTransferState.flushTimer = null; }
     lastUIUpdate = 0;
-    try {
-        await idbPutMeta({ id: info.id, name: info.name, size: info.size, type: info.type, chunks: info.chunks, receivedCount: 0, status: 'receiving' });
-    } catch (e) { console.error('idbPutMeta 失败', e); }
     showReceivingFile(info);
-    await sendResumeRequest(info.id, info.chunks);
 }
 
-async function sendResumeRequest(id, total) {
-    const bitmap = await buildBitmapFromIdb(id, total);
-    try {
-        conn.send(JSON.stringify({ type: 'file-resume-request', id, bitmap: u8ToBase64(bitmap), total }));
-    } catch (e) {
-        console.error('发 resume-request 失败', e);
-    }
-}
-
-async function buildBitmapFromIdb(id, total) {
-    const bitmap = new Uint8Array(Math.ceil(total / 8));
-    try {
-        await idbIterateChunks(id, (data, seq) => { bitmapSet(bitmap, seq); });
-    } catch (e) { console.warn('buildBitmapFromIdb 失败', e); }
-    return bitmap;
-}
-
-async function handleFileChunk(chunk) {
-    if (!fileTransferState.receiving || !fileTransferState.fileInfo) return;
-    if (!fileTransferState.receivedBitmap) return;
-
-    const view = new DataView(chunk);
-    const seq = view.getUint32(0, false);  
-    const data = chunk.slice(4);
-    if (seq >= fileTransferState.fileInfo.chunks) return;
-
-    if (bitmapGet(fileTransferState.receivedBitmap, seq)) return;
-    
-    bitmapSet(fileTransferState.receivedBitmap, seq);
-    fileTransferState.receivedCount++;
-    fileTransferState.receivedSize += data.byteLength;
-    fileTransferState.pendingWrites.push({ seq, data: new Uint8Array(data) });
-
-    if (fileTransferState.pendingWrites.length >= 32) {
-        await flushPendingWrites();
-    } else if (!fileTransferState.flushTimer) {
-        fileTransferState.flushTimer = setTimeout(() => { flushPendingWrites(); }, 50);
-    }
-
-    const now = Date.now();
-    if (now - lastUIUpdate > UI_UPDATE_INTERVAL) {
-        updateReceiveProgress();
-        lastUIUpdate = now;
-    }
-
-    if (fileTransferState.receivedCount === fileTransferState.fileInfo.chunks) {
-        await flushPendingWrites();  
-        updateReceiveProgress();
-        handleFileComplete();
-    }
-}
-
-async function flushPendingWrites() {
-    if (fileTransferState.flushTimer) { clearTimeout(fileTransferState.flushTimer); fileTransferState.flushTimer = null; }
-    const pending = fileTransferState.pendingWrites;
-    if (pending.length === 0) return;
-    fileTransferState.pendingWrites = [];
-    try {
-        await idbPutChunks(fileTransferState.fileInfo.id, pending);
-        const meta = await idbGetMeta(fileTransferState.fileInfo.id);
-        if (meta) { meta.receivedCount = fileTransferState.receivedCount; await idbPutMeta(meta); }
-    } catch (e) {
-        console.error('IDB 批量写入失败', e);
-    }
-}
-
-async function handleFileComplete() {
+// 接收文件分片
+function handleFileChunk(chunk) {
     if (!fileTransferState.receiving) return;
-    fileTransferState.receiving = false;
-    const info = fileTransferState.fileInfo;
-    currentReceiveFile = null;
-    console.log('[接收] 所有分片已收齐，等待用户下载');
-    addLog(`文件接收完成: ${info.name}（点击下载按钮保存）`, 'success');
-
-    try { conn.send(JSON.stringify({ type: 'file-complete-ack', id: info.id })); } catch (e) {}
-
-    try {
-        const meta = await idbGetMeta(info.id);
-        if (meta) { meta.status = 'done'; await idbPutMeta(meta); }
-    } catch (e) { console.warn('更新 meta done 失败', e); }
-
-    showDownloadReady(info);
     
-    // 检查并处理接收队列中的下一个文件
-    if (receiveQueue.length > 0) {
-        const nextFile = receiveQueue.shift();
-        console.log(`[接收] 开始处理队列中的下一个文件: ${nextFile.name}`);
-        startReceivingFile(nextFile);
+    const view = new DataView(chunk);
+    const seq = view.getUint32(0, false);
+    const data = chunk.slice(4);
+    if (seq >= fileTransferState.fileInfo.chunks) { 
+        console.warn(`[接收] 收到非法序号 ${seq}，忽略`);
+        return; 
     }
-}
-
-function showDownloadReady(info) {
-    const list = document.getElementById('receivingList');
-    let item = document.querySelector(`#receivingList .file-item[data-id="${info.id}"]`);
-    if (!item) {
-        item = document.createElement('div');
-        item.className = 'file-item';
-        item.dataset.id = info.id;
-        list.appendChild(item);
-    }
-    item.innerHTML = `
-        <div class="file-item-icon">📄</div>
-        <div class="file-item-info">
-            <div class="file-item-name">${escapeHTML(info.name)}</div>
-            <div class="file-item-meta">${formatSize(info.size)} • 已接收完成</div>
-        </div>
-        <button class="btn btn-primary" style="padding:8px 12px;font-size:13px;margin-left:8px" onclick="downloadReceivedFile('${info.id}')">📥 下载</button>
-    `;
-}
-
-async function downloadReceivedFile(id) {
-    let meta;
-    try { meta = await idbGetMeta(id); } catch (e) { meta = null; }
-    if (!meta) { addLog('❌ 文件数据已不存在', 'error'); return; }
-    try {
-        if (window.showSaveFilePicker) {
-            const handle = await window.showSaveFilePicker({ 
-                suggestedName: meta.name
-            });
-            const writable = await handle.createWritable();
-            // IDB 游标按 seq 升序读取，直接流式写入即可保证顺序
-            await idbIterateChunks(id, async (data) => { await writable.write(data); });
-            await writable.close();
-            addLog(`✅ 文件已保存: ${meta.name}`, 'success');
-        } else {
-            if (meta.size > 500 * 1024 * 1024) {
-                throw new Error('文件过大(>500MB)，请使用Chrome等支持文件系统访问API的浏览器');
-            }
-            const chunks = [];
-            await idbIterateChunks(id, (data, seq) => { chunks.push({ seq, data }); });
-            // 回退方案必须排序以防万一
-            chunks.sort((a, b) => a.seq - b.seq);
-            const parts = chunks.map(c => c.data);
-            const blob = new Blob(parts, { type: meta.type || 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; 
-            a.download = meta.name; 
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-            addLog(`✅ 文件已保存: ${meta.name}`, 'success');
+    
+    if (!fileTransferState.receivedChunks[seq]) {
+        fileTransferState.receivedChunks[seq] = new Uint8Array(data);
+        fileTransferState.receivedCount++;
+        fileTransferState.receivedSize += data.byteLength;
+        
+        console.log(`[接收] 收到分片 ${seq}，累计 ${fileTransferState.receivedCount}/${fileTransferState.fileInfo.chunks}`);
+        
+        const now = Date.now();
+        if (now - lastUIUpdate > UI_UPDATE_INTERVAL) {
+            updateReceiveProgress();
+            lastUIUpdate = now;
         }
         
-        // 下载成功后清理 IDB
-        await idbClearTransfer(id);
-        const item = document.querySelector(`#receivingList .file-item[data-id="${id}"]`);
-        if (item) item.remove();
-        if (document.getElementById('receivingList').children.length === 0) {
-            document.getElementById('receivingCard').classList.add('hidden');
+        if (fileTransferState.receivedCount === fileTransferState.fileInfo.chunks) {
+            console.log('[接收] 所有分片已收齐，开始重组');
+            updateReceiveProgress();
+            handleFileComplete();
         }
-    } catch (e) {
-        if (e && e.name === 'AbortError') { addLog('已取消下载', 'system'); return; }
-        addLog(`❌ 下载失败: ${e.message}`, 'error');
-        console.error('下载失败', e);
+    } else {
+        console.log(`[接收] 重复分片 ${seq}，忽略`);
     }
+}
+
+// 文件接收完成
+function handleFileComplete() {
+    if (!fileTransferState.receiving) return;
+    console.log('[接收] 正在重组文件...');
+    const blob = new Blob(fileTransferState.receivedChunks, { type: fileTransferState.fileInfo.type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileTransferState.fileInfo.name;
+    a.click();
+    addLog(`文件接收完成: ${fileTransferState.fileInfo.name}`, 'success');
+    console.log('[接收] 文件已保存');
+    fileTransferState.receiving = false;
+    fileTransferState.receivedChunks = [];
+    fileTransferState.receivedCount = 0;
+    fileTransferState.receivedSize = 0;
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function showReceivingFile(info) {
     document.getElementById('receivingCard').classList.remove('hidden');
     const list = document.getElementById('receivingList');
-    let item = document.querySelector(`#receivingList .file-item[data-id="${info.id}"]`);
-    if (!item) {
-        item = document.createElement('div');
-        item.className = 'file-item';
-        item.dataset.id = info.id;
-        list.appendChild(item);
-    }
-    item.innerHTML = `
-        <div class="file-item-icon">📄</div>
-        <div class="file-item-info">
-            <div class="file-item-name">${escapeHTML(info.name)}</div>
-            <div class="file-item-meta">${formatSize(info.size)} • 接收中... (0/${info.chunks} 片)</div>
-            <div class="file-progress"><div class="file-progress-bar" style="width:0%"></div></div>
+    list.innerHTML = `
+        <div class="file-item">
+            <div class="file-item-icon">📄</div>
+            <div class="file-item-info">
+                <div class="file-item-name">${escapeHTML(info.name)}</div>
+                <div class="file-item-meta">${formatSize(info.size)} • 接收中... (0/${info.chunks} 片)</div>
+                <div class="file-progress"><div class="file-progress-bar" style="width:0%"></div></div>
+            </div>
         </div>
     `;
 }
@@ -1171,16 +773,12 @@ function updateSendProgress(percent) {
 }
 
 function updateReceiveProgress() {
-    if (!fileTransferState.fileInfo) return;
-    const percent = Math.round((fileTransferState.receivedCount / fileTransferState.fileInfo.chunks) * 100);
-    const item = document.querySelector(`#receivingList .file-item[data-id="${fileTransferState.fileInfo.id}"]`);
-    if (item) {
-        const bar = item.querySelector('.file-progress-bar');
-        if (bar) bar.style.width = percent + '%';
-        const meta = item.querySelector('.file-item-meta');
-        if (meta) {
-            meta.textContent = `${formatSize(fileTransferState.fileInfo.size)} • 接收中... (${fileTransferState.receivedCount}/${fileTransferState.fileInfo.chunks} 片)`;
-        }
+    const percent = Math.round((fileTransferState.receivedSize / fileTransferState.fileInfo.size) * 100);
+    const bar = document.querySelector('#receivingList .file-progress-bar');
+    if (bar) bar.style.width = percent + '%';
+    const meta = document.querySelector('#receivingList .file-item-meta');
+    if (meta && fileTransferState.fileInfo) {
+        meta.textContent = `${formatSize(fileTransferState.fileInfo.size)} • 接收中... (${fileTransferState.receivedCount}/${fileTransferState.fileInfo.chunks} 片)`;
     }
 }
 
@@ -1202,6 +800,7 @@ function escapeHTML(str) {
     });
 }
 
+// ==================== 文件中转模式文件处理 ====================
 function handleTransferFile(input) {
     const files = input.files;
     if (!files || files.length === 0) return;
@@ -1211,53 +810,86 @@ function handleTransferFile(input) {
 
 // ==================== 语音消息录制 ====================
 async function startVoiceRecording() {
-    if (!conn || conn.open !== true) { alert('请先建立连接'); return; }
+    if (!conn || conn.open !== true) {
+        alert('请先建立连接');
+        return;
+    }
     if (mediaRecorder && mediaRecorder.state === 'recording') return;
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioChunks = [];
         mediaRecorder = new MediaRecorder(stream);
+        
         mediaRecorder.ondataavailable = event => {
-            if (event.data.size > 0) audioChunks.push(event.data);
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
         };
-        mediaRecorder.onstop = () => { stream.getTracks().forEach(track => track.stop()); };
+        
+        mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
         mediaRecorder.start();
         recordingStartTime = Date.now();
+        
         document.getElementById('voiceMsgBtn').style.backgroundColor = 'var(--danger)';
+        
         recordingTimer = setTimeout(() => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') stopVoiceRecording(true);
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                stopVoiceRecording(true);
+            }
         }, 60000);
+        
     } catch (err) {
+        console.error('无法访问麦克风:', err);
         alert('无法访问麦克风: ' + err.message);
     }
 }
 
 function stopVoiceRecording(autoSent = false) {
     if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+    
     clearTimeout(recordingTimer);
     mediaRecorder.stop();
+    
     document.getElementById('voiceMsgBtn').style.backgroundColor = '';
+    
     setTimeout(() => {
         if (audioChunks.length === 0) return;
+        
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         const reader = new FileReader();
+        
         reader.onload = function(e) {
             const base64Audio = e.target.result;
-            conn.send(JSON.stringify({ type: 'voice', data: base64Audio, duration: Math.round((Date.now() - recordingStartTime) / 1000) }));
+            
+            conn.send(JSON.stringify({
+                type: 'voice',
+                data: base64Audio,
+                duration: Math.round((Date.now() - recordingStartTime) / 1000)
+            }));
+            
             addVoiceMsg('我', base64Audio, (Date.now() - recordingStartTime) / 1000, 'sent');
         };
+        
         reader.readAsDataURL(audioBlob);
     }, 200);
 }
 
 function cancelVoiceRecording() {
     if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+    
     clearTimeout(recordingTimer);
     mediaRecorder.stop();
+    
     audioChunks = [];
     document.getElementById('voiceMsgBtn').style.backgroundColor = '';
-    if (mediaRecorder.stream) { mediaRecorder.stream.getTracks().forEach(track => track.stop()); }
+    
+    if (mediaRecorder.stream) {
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
 }
 
 function addVoiceMsg(sender, base64Data, duration, type) {
@@ -1265,6 +897,7 @@ function addVoiceMsg(sender, base64Data, duration, type) {
     const div = document.createElement('div');
     div.className = `message ${type}`;
     const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    
     div.innerHTML = `
         <div class="msg-avatar">${sender === '我' ? '我' : '友'}</div>
         <div>
@@ -1279,42 +912,14 @@ function addVoiceMsg(sender, base64Data, duration, type) {
     div.scrollIntoView({behavior:'smooth'});
 }
 
-// ==================== 编解码偏好 ====================
-function preferCodec(pc, kind, codecMime) {
-    try {
-        const caps = RTCRtpSender.getCapabilities(kind);
-        if (!caps) return;
-        const target = codecMime.toLowerCase();
-        const preferred = caps.codecs.filter(c => c.mimeType.toLowerCase() === target);
-        if (preferred.length === 0) return;
-        const rest = caps.codecs.filter(c => c.mimeType.toLowerCase() !== target);
-        const ordered = [...preferred, ...rest];
-        pc.getTransceivers().forEach(t => {
-            if (t.sender && t.sender.track && t.sender.track.kind === kind) {
-                try { t.setCodecPreferences(ordered); } catch (e) {}
-            }
-        });
-    } catch (e) {}
-}
-
 // ==================== 自适应码率 ====================
 function startAdaptiveBitrate(pc) {
     if (pc._adaptationInterval) clearInterval(pc._adaptationInterval);
+    
     pc._smoothBandwidth = null;
     pc._lastAdjustTime = 0;
     const ALPHA = 0.3;
-    const ADJUST_COOLDOWN = 4000;
-    const POLL_INTERVAL = 2000;
-
-    try {
-        const senders = pc.getSenders();
-        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-        if (videoSender) {
-            const params = videoSender.getParameters();
-            params.degradationPreference = 'balanced';
-            videoSender.setParameters(params).catch(() => {});
-        }
-    } catch (e) {}
+    const ADJUST_COOLDOWN = 6000;
 
     pc._adaptationInterval = setInterval(async () => {
         if (!pc || pc.connectionState !== 'connected' || !isInCall) {
@@ -1322,6 +927,7 @@ function startAdaptiveBitrate(pc) {
             pc._adaptationInterval = null;
             return;
         }
+
         const now = Date.now();
         if (now - pc._lastAdjustTime < ADJUST_COOLDOWN) return;
 
@@ -1329,158 +935,183 @@ function startAdaptiveBitrate(pc) {
             const stats = await pc.getStats();
             let bandwidth = null;
             stats.forEach(report => {
-                if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) {
-                    if (report.availableOutgoingBitrate) bandwidth = report.availableOutgoingBitrate;
-                }
-            });
-            if (bandwidth == null) {
-                stats.forEach(report => {
-                    if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.availableOutgoingBitrate && bandwidth == null) {
+                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                    if (report.availableOutgoingBitrate) {
                         bandwidth = report.availableOutgoingBitrate;
                     }
-                });
-            }
+                }
+            });
+
             if (!bandwidth) return;
 
-            if (pc._smoothBandwidth === null) pc._smoothBandwidth = bandwidth;
-            else pc._smoothBandwidth = ALPHA * bandwidth + (1 - ALPHA) * pc._smoothBandwidth;
+            if (pc._smoothBandwidth === null) {
+                pc._smoothBandwidth = bandwidth;
+            } else {
+                pc._smoothBandwidth = ALPHA * bandwidth + (1 - ALPHA) * pc._smoothBandwidth;
+            }
 
             const senders = pc.getSenders();
             const videoSender = senders.find(s => s.track && s.track.kind === 'video');
             if (!videoSender) return;
+
             const params = videoSender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+            if (!params.encodings || params.encodings.length === 0) {
+                params.encodings = [{}];
+            }
 
-            let maxBitrate, maxFramerate, scaleDownBy;
-            const bw = pc._smoothBandwidth;
-            if (bw < 150000) { maxBitrate = 120000; maxFramerate = 10; scaleDownBy = 4.0; } 
-            else if (bw < 300000) { maxBitrate = 200000; maxFramerate = 12; scaleDownBy = 2.5; } 
-            else if (bw < 500000) { maxBitrate = 350000; maxFramerate = 15; scaleDownBy = 2.0; } 
-            else if (bw < 1000000) { maxBitrate = 700000; maxFramerate = 24; scaleDownBy = 1.5; } 
-            else if (bw < 2000000) { maxBitrate = 1200000; maxFramerate = 30; scaleDownBy = 1.0; } 
-            else { maxBitrate = 2000000; maxFramerate = 30; scaleDownBy = 1.0; }
+            let maxBitrate, scaleDownBy;
+            if (pc._smoothBandwidth < 300000) {
+                maxBitrate = 150000;
+                scaleDownBy = 2.0;
+            } else if (pc._smoothBandwidth < 800000) {
+                maxBitrate = 400000;
+                scaleDownBy = 1.5;
+            } else if (pc._smoothBandwidth < 2000000) {
+                maxBitrate = 1000000;
+                scaleDownBy = 1.0;
+            } else {
+                maxBitrate = 2000000;
+                scaleDownBy = 1.0;
+            }
 
-            const enc = params.encodings[0];
-            if (enc.maxBitrate !== maxBitrate || enc.maxFramerate !== maxFramerate || enc.scaleResolutionDownBy !== scaleDownBy) {
-                enc.maxBitrate = maxBitrate;
-                enc.maxFramerate = maxFramerate;
-                enc.scaleResolutionDownBy = scaleDownBy;
+            if (params.encodings[0].maxBitrate !== maxBitrate || params.encodings[0].scaleResolutionDownBy !== scaleDownBy) {
+                params.encodings[0].maxBitrate = maxBitrate;
+                params.encodings[0].scaleResolutionDownBy = scaleDownBy;
                 await videoSender.setParameters(params);
                 pc._lastAdjustTime = now;
+                console.log(`自适应调整: 平滑带宽=${(pc._smoothBandwidth/1000).toFixed(0)}kbps, 码率=${maxBitrate/1000}kbps, 缩放=${scaleDownBy}`);
             }
-        } catch (err) {}
-    }, POLL_INTERVAL);
-}
 
-// ==================== ICE 重启处理 ====================
-function setupIceRestartHandler(pc) {
-    pc._isRestartingIce = false;
-    pc._iceRestartCount = 0;
-    const MAX_ICE_RESTARTS = 3;
-
-    const doRestart = (reason) => {
-        if (pc._isRestartingIce) return;
-        if (pc._iceRestartCount >= MAX_ICE_RESTARTS) {
-            addLog(`❌ 网络持续不可用（ICE 重启 ${MAX_ICE_RESTARTS} 次仍失败），通话结束`, 'error');
-            hangup();
-            return;
+        } catch (err) {
+            console.error('自适应调整失败:', err);
         }
-        pc._isRestartingIce = true;
-        pc._iceRestartCount++;
-        addLog(`${reason}（第 ${pc._iceRestartCount}/${MAX_ICE_RESTARTS} 次重启 ICE）`, 'warning');
-        clearTimeout(window.iceDisconnectTimer);
-        try {
-            pc.restartIce();
-            setTimeout(() => { pc._isRestartingIce = false; }, 5000);
-        } catch (e) {
-            pc._isRestartingIce = false;
-            hangup();
-        }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-        const state = pc.iceConnectionState;
-        if (state === 'failed') {
-            doRestart('⚠️ ICE 连接失败，尝试重启');
-        } else if (state === 'disconnected') {
-            if (pc._isRestartingIce) return;
-            addLog('⚠️ 网络暂时断开，5 秒后尝试恢复...', 'warning');
-            clearTimeout(window.iceDisconnectTimer);
-            window.iceDisconnectTimer = setTimeout(() => {
-                if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-                    doRestart('网络仍断开，尝试重启 ICE');
-                }
-            }, 5000);
-        } else if (state === 'connected' || state === 'completed') {
-            clearTimeout(window.iceDisconnectTimer);
-            pc._isRestartingIce = false;
-            pc._iceRestartCount = 0;  
-        }
-    };
-}
-
-// ==================== 屏幕唤醒锁 ====================
-async function requestWakeLock() {
-    if (!('wakeLock' in navigator)) return;
-    try {
-        if (wakeLock) { try { await wakeLock.release(); } catch(e){} }
-        wakeLock = await navigator.wakeLock.request('screen');
-    } catch (err) {}
-}
-
-function onWakeLockVisibilityChange() {
-    if (isInCall && document.visibilityState === 'visible' && 'wakeLock' in navigator) {
-        requestWakeLock();
-    }
+    }, ADJUST_COOLDOWN);
 }
 
 // ==================== 音视频通话 ====================
 async function startCall(type) {
-    if (!conn || !peer) { return alert('请先建立连接'); }
-    if (conn.open !== true) { return alert('数据通道未完全打开'); }
-    if (isInCall) { return alert('正在通话中'); }
+    if (!conn || !peer) { addLog('❌ 请先建立数据连接', 'error'); return alert('请先建立连接'); }
+    if (conn.open !== true) { addLog('❌ 数据连接未就绪', 'error'); return alert('数据通道未完全打开'); }
+    if (isInCall) { addLog('⚠️ 正在通话中', 'warning'); return alert('正在通话中'); }
     document.getElementById('callBtn').disabled = true;
     document.getElementById('voiceBtn').disabled = true;
     try {
-        try { conn.send(JSON.stringify({ type: 'call-request', callType: type })); } catch(e) {}
-
-        const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000, sampleSize: 16, channelCount: 1 };
-        const constraints = type === 'video'
-            ? { video: { width: { ideal: 1280, max: 1920 }, height: { ideal: 720, max: 1080 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: 16/9, facingMode: 'user' }, audio: audioConstraints }
-            : { video: false, audio: audioConstraints };
-
+        const constraints = type === 'video' 
+            ? {
+                video: {
+                    width: { ideal: 1280, max: 1920 },
+                    height: { ideal: 720, max: 1080 },
+                    frameRate: { ideal: 24, max: 30 }
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000
+                }
+              }
+            : {
+                video: false,
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000
+                }
+              };
+        
+        addLog('正在请求摄像头/麦克风权限...', 'system');
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
         document.getElementById('localVideo').srcObject = localStream;
-
+        
+        addLog(`正在呼叫对方 (ID: ${conn.peer})...`, 'system');
         const call = peer.call(conn.peer, localStream);
         if (!call) throw new Error('peer.call 返回空');
+        
         currentCall = call;
-
+        
         const pc = call._pc || call.peerConnection;
         if (pc) {
-            preferCodec(pc, 'video', 'video/H264');
-            preferCodec(pc, 'audio', 'audio/opus');
-            setupIceRestartHandler(pc);
+            pc._call = call;
+            pc._isRestartingIce = false;
+
+            pc.oniceconnectionstatechange = () => {
+                const state = pc.iceConnectionState;
+                console.log('ICE状态变化:', state);
+                
+                if (state === 'failed') {
+                    if (pc._isRestartingIce) return;
+                    pc._isRestartingIce = true;
+                    addLog('⚠️ ICE连接失败，尝试重启...', 'warning');
+                    clearTimeout(window.iceDisconnectTimer);
+                    try {
+                        pc.restartIce();
+                        setTimeout(() => { pc._isRestartingIce = false; }, 5000);
+                    } catch (e) {
+                        console.error('restartIce 失败:', e);
+                        pc._isRestartingIce = false;
+                        hangup();
+                    }
+                } else if (state === 'disconnected') {
+                    if (pc._isRestartingIce) return;
+                    addLog('⚠️ 网络暂时断开，5秒后尝试恢复...', 'warning');
+                    clearTimeout(window.iceDisconnectTimer);
+                    window.iceDisconnectTimer = setTimeout(() => {
+                        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+                            if (pc._isRestartingIce) return;
+                            pc._isRestartingIce = true;
+                            addLog('尝试重启ICE...', 'warning');
+                            try {
+                                pc.restartIce();
+                                setTimeout(() => { pc._isRestartingIce = false; }, 5000);
+                            } catch (e) {
+                                console.error('restartIce 失败:', e);
+                                pc._isRestartingIce = false;
+                                hangup();
+                            }
+                        }
+                    }, 5000);
+                } else if (state === 'connected' || state === 'completed') {
+                    clearTimeout(window.iceDisconnectTimer);
+                    pc._isRestartingIce = false;
+                }
+            };
+
             startAdaptiveBitrate(pc);
         }
 
         call.on('stream', (remoteStream) => {
+            addLog('✅ 已接收到对方视频流', 'success');
             document.getElementById('remoteVideo').srcObject = remoteStream;
         });
-        call.on('close', () => { cleanupCall(); });
-        call.on('error', (err) => { cleanupCall(); });
+
+        call.on('close', () => {
+            addLog('通话已关闭', 'system');
+            cleanupCall();
+        });
+
+        call.on('error', (err) => {
+            addLog(`通话错误: ${err}`, 'error');
+            cleanupCall();
+        });
 
         isInCall = true;
         document.getElementById('callOverlay').classList.add('active');
-        resetCallControlsState(type);
         addMsg('系统', type === 'video' ? '📹 视频通话发起中...' : '📞 语音通话发起中...', 'system');
 
-        await requestWakeLock();
-        document.addEventListener('visibilitychange', onWakeLockVisibilityChange);
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                console.error('唤醒锁失败:', err);
+            }
+        }
 
     } catch (err) {
-        alert('启动失败: ' + err.message);
+        addLog(`❌ 通话启动失败: ${err.message}`, 'error');
+        console.error('通话错误详情:', err);
         cleanupCall();
+        alert('启动失败: ' + err.message);
     } finally {
         if (!isInCall) {
             document.getElementById('callBtn').disabled = false;
@@ -1490,47 +1121,120 @@ async function startCall(type) {
 }
 
 function handleIncomingCall(call) {
-    if (isInCall) { call.close(); return; }
-    let callType = pendingCallType;
-    if (callType) pendingCallType = null;
-    else callType = 'video';  
+    if (isInCall) {
+        addLog('⚠️ 已有一个通话，拒绝新来电', 'warning');
+        call.close();
+        return;
+    }
 
-    const typeLabel = callType === 'video' ? '视频' : '语音';
-    if (!confirm(`📞 收到${typeLabel}通话请求，是否接听？`)) { call.close(); return; }
+    if (!confirm('📞 收到通话请求，是否接听？')) {
+        call.close();
+        return;
+    }
 
-    const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000, sampleSize: 16, channelCount: 1 };
-    const constraints = callType === 'video'
-        ? { video: { width: { ideal: 1280, max: 1920 }, height: { ideal: 720, max: 1080 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: 16/9, facingMode: 'user' }, audio: audioConstraints }
-        : { video: false, audio: audioConstraints };
+    addLog('正在获取本地媒体流...', 'system');
+    const constraints = {
+        video: {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            frameRate: { ideal: 24, max: 30 }
+        },
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000
+        }
+    };
 
     navigator.mediaDevices.getUserMedia(constraints)
         .then(stream => {
             localStream = stream;
             document.getElementById('localVideo').srcObject = stream;
+            
+            addLog('正在应答通话...', 'system');
             call.answer(stream);
             currentCall = call;
 
             const pc = call._pc || call.peerConnection;
             if (pc) {
-                preferCodec(pc, 'video', 'video/H264');
-                preferCodec(pc, 'audio', 'audio/opus');
-                setupIceRestartHandler(pc);
+                pc._isRestartingIce = false;
+                pc.oniceconnectionstatechange = () => {
+                    const state = pc.iceConnectionState;
+                    console.log('ICE状态变化(接收方):', state);
+                    
+                    if (state === 'failed') {
+                        if (pc._isRestartingIce) return;
+                        pc._isRestartingIce = true;
+                        addLog('⚠️ ICE连接失败，尝试重启...', 'warning');
+                        clearTimeout(window.iceDisconnectTimer);
+                        try {
+                            pc.restartIce();
+                            setTimeout(() => { pc._isRestartingIce = false; }, 5000);
+                        } catch (e) {
+                            console.error('restartIce 失败:', e);
+                            pc._isRestartingIce = false;
+                            hangup();
+                        }
+                    } else if (state === 'disconnected') {
+                        if (pc._isRestartingIce) return;
+                        addLog('⚠️ 网络暂时断开，5秒后尝试恢复...', 'warning');
+                        clearTimeout(window.iceDisconnectTimer);
+                        window.iceDisconnectTimer = setTimeout(() => {
+                            if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+                                if (pc._isRestartingIce) return;
+                                pc._isRestartingIce = true;
+                                addLog('尝试重启ICE...', 'warning');
+                                try {
+                                    pc.restartIce();
+                                    setTimeout(() => { pc._isRestartingIce = false; }, 5000);
+                                } catch (e) {
+                                    console.error('restartIce 失败:', e);
+                                    pc._isRestartingIce = false;
+                                    hangup();
+                                }
+                            }
+                        }, 5000);
+                    } else if (state === 'connected' || state === 'completed') {
+                        clearTimeout(window.iceDisconnectTimer);
+                        pc._isRestartingIce = false;
+                    }
+                };
+
                 startAdaptiveBitrate(pc);
             }
+            
+            call.on('stream', (remoteStream) => {
+                addLog('✅ 已接收到对方视频流', 'success');
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+            });
+            
+            call.on('close', () => {
+                addLog('通话已关闭', 'system');
+                cleanupCall();
+            });
 
-            call.on('stream', (remoteStream) => { document.getElementById('remoteVideo').srcObject = remoteStream; });
-            call.on('close', () => { cleanupCall(); });
-            call.on('error', (err) => { cleanupCall(); });
-
+            call.on('error', (err) => {
+                addLog(`通话错误: ${err}`, 'error');
+                cleanupCall();
+            });
+            
             isInCall = true;
             document.getElementById('callOverlay').classList.add('active');
-            resetCallControlsState(callType);
-            addMsg('系统', `📞 ${typeLabel}通话已连接`, 'system');
+            addMsg('系统', '📞 通话已连接', 'system');
 
-            requestWakeLock();
-            document.addEventListener('visibilitychange', onWakeLockVisibilityChange);
+            if ('wakeLock' in navigator) {
+                try {
+                    navigator.wakeLock.request('screen').then(lock => {
+                        wakeLock = lock;
+                    });
+                } catch (err) {
+                    console.error('唤醒锁失败:', err);
+                }
+            }
         })
         .catch(err => {
+            addLog(`❌ 无法获取媒体流: ${err.message}`, 'error');
             alert('无法获取摄像头/麦克风: ' + err.message);
             call.close();
         });
@@ -1543,103 +1247,45 @@ function hangup() {
 }
 
 function cleanupCall() {
-    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (localStream) { 
+        localStream.getTracks().forEach(t => t.stop()); 
+        localStream = null; 
+    }
     document.getElementById('remoteVideo').srcObject = null;
     document.getElementById('localVideo').srcObject = null;
     document.getElementById('callOverlay').classList.remove('active');
     
     if (currentCall) {
         const pc = currentCall._pc || currentCall.peerConnection;
-        if (pc && pc._adaptationInterval) { clearInterval(pc._adaptationInterval); pc._adaptationInterval = null; }
+        if (pc) {
+            if (pc._adaptationInterval) {
+                clearInterval(pc._adaptationInterval);
+                pc._adaptationInterval = null;
+            }
+            pc._isRestartingIce = false;
+        }
     }
     
     isInCall = false;
     currentCall = null;
-    currentCallType = null;
-    currentFacingMode = 'user';
     document.getElementById('callBtn').disabled = false;
     document.getElementById('voiceBtn').disabled = false;
 
-    document.removeEventListener('visibilitychange', onWakeLockVisibilityChange);
-    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+    }
+
     clearTimeout(window.iceDisconnectTimer);
 }
 
 function toggleMute() {
     if (!localStream) return;
     const audio = localStream.getAudioTracks()[0];
-    if (audio) {
-        audio.enabled = !audio.enabled;
-        document.getElementById('muteBtn').textContent = audio.enabled ? '🎤' : '🎙️';
+    if (audio) { 
+        audio.enabled = !audio.enabled; 
+        document.getElementById('muteBtn').textContent = audio.enabled ? '🎤' : '🎙️'; 
     }
-}
-
-function resetCallControlsState(callType) {
-    currentCallType = callType;
-    currentFacingMode = 'user';
-    const cameraBtn = document.getElementById('cameraBtn');
-    const switchCamBtn = document.getElementById('switchCamBtn');
-    const speakerBtn = document.getElementById('speakerBtn');
-
-    const isVideo = callType === 'video';
-    if (cameraBtn) cameraBtn.hidden = !isVideo;
-    if (switchCamBtn) switchCamBtn.hidden = !isVideo;
-    const sinkSupported = 'setSinkId' in HTMLMediaElement.prototype;
-    if (speakerBtn) speakerBtn.hidden = !sinkSupported;
-    if (cameraBtn) cameraBtn.textContent = '🎥';
-
-    if (sinkSupported) { enumerateAudioOutputs().catch(() => {}); }
-}
-
-function toggleCamera() {
-    if (!localStream) return;
-    const video = localStream.getVideoTracks()[0];
-    if (!video) return;
-    video.enabled = !video.enabled;
-    document.getElementById('cameraBtn').textContent = video.enabled ? '🎥' : '🙈';
-}
-
-async function switchCamera() {
-    if (!localStream) return;
-    const video = localStream.getVideoTracks()[0];
-    if (!video) return;
-    const next = currentFacingMode === 'user' ? 'environment' : 'user';
-    try {
-        await video.applyConstraints({ video: { facingMode: next } });
-        currentFacingMode = next;
-    } catch (e) {
-        try {
-            const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: next }, audio: false });
-            const newTrack = newStream.getVideoTracks()[0];
-            const sender = (currentCall && (currentCall._pc || currentCall.peerConnection))
-                ? (currentCall._pc || currentCall.peerConnection).getSenders().find(s => s.track && s.track.kind === 'video') : null;
-            if (sender) await sender.replaceTrack(newTrack);
-            localStream.removeTrack(video);
-            localStream.addTrack(newTrack);
-            video.stop();
-            document.getElementById('localVideo').srcObject = localStream;
-            currentFacingMode = next;
-        } catch (err2) {}
-    }
-}
-
-async function enumerateAudioOutputs() {
-    if (!('setSinkId' in HTMLMediaElement.prototype)) return;
-    try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
-        currentAudioOutputIndex = 0;
-    } catch (e) { audioOutputDevices = []; }
-}
-
-async function toggleSpeaker() {
-    if (!('setSinkId' in HTMLMediaElement.prototype)) return;
-    if (audioOutputDevices.length === 0) await enumerateAudioOutputs();
-    if (audioOutputDevices.length < 2) return;
-    currentAudioOutputIndex = (currentAudioOutputIndex + 1) % audioOutputDevices.length;
-    const dev = audioOutputDevices[currentAudioOutputIndex];
-    const remoteVideo = document.getElementById('remoteVideo');
-    try { await remoteVideo.setSinkId(dev.deviceId); } catch (e) {}
 }
 
 // ==================== UI 消息显示 ====================
@@ -1658,7 +1304,7 @@ function addImg(sender, src, type) {
     const div = document.createElement('div');
     div.className = `message ${type}`;
     const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
-    div.innerHTML = `<div class="msg-avatar">${sender==='我'?'我':'友'}</div><div><div class="msg-content" style="padding:4px"><img src="${src}" class="msg-image" onclick="window.open(this.src)" style="max-width:200px;border-radius:8px"></div><div class="msg-time">${time}</div></div>`;
+    div.innerHTML = `<div class="msg-avatar">${sender==='我'?'我':'友'}</div><div><div class="msg-content" style="padding:4px"><img src="${src}" class="msg-image" onclick="window.open(this.src)"></div><div class="msg-time">${time}</div></div>`;
     messages.appendChild(div);
     div.scrollIntoView({behavior:'smooth'});
 }
@@ -1681,7 +1327,9 @@ if (dropZone) {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         const files = e.dataTransfer.files;
-        if (files.length) addFilesToQueue(files);
+        if (files.length) {
+            addFilesToQueue(files);
+        }
     });
 }
 
@@ -1690,6 +1338,8 @@ init();
 </script>
 <script>
   if ('serviceWorker' in navigator) {
+    // 注意：如果站点在子目录（如 /project/），注册路径需要包含子目录前缀
+    // 一般使用相对路径 './sw.js' 或绝对路径 '/project/sw.js'
     navigator.serviceWorker.register('./sw.js').then(reg => {
       console.log('Service Worker 注册成功，作用域:', reg.scope);
     }).catch(err => {
