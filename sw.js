@@ -1,7 +1,7 @@
 // sw.js - 通用Service Worker
 // 确保离线可访问，预缓存首页、manifest 及关键资源
 
-const CACHE_NAME = 'asset-config-cache-v113';
+const CACHE_NAME = 'asset-config-cache-v114';
 // 需要预缓存的关键资源列表（可根据实际扩展）
 const PRECACHE_URLS = [
   '/',               // 根路径（返回 index.html）
