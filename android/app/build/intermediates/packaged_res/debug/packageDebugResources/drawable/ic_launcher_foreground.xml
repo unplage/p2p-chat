@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Left peer node -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,54 m-9,0 a9,9 0,1,1 18,0 a9,9 0,1,1 -18,0" />
+
+    <!-- Right peer node -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M78,54 m-9,0 a9,9 0,1,1 18,0 a9,9 0,1,1 -18,0" />
+
+    <!-- Waveform connection between peers (sine wave with 2.5 cycles) -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M39,54 C42,38 44,38 47,54 C50,70 52,70 55,54 C58,38 60,38 63,54 C66,70 68,70 69,54" />
+
+</vector>

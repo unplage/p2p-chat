@@ -1,0 +1,151 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.p2pchat.app"
+4    android:versionCode="1"
+5    android:versionName="1.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:4:5-67
+11-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:5:5-79
+12-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:5:22-76
+13    <uses-permission android:name="android.permission.CAMERA" />
+13-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:6:5-65
+13-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:6:22-62
+14    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+14-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:7:5-71
+14-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:7:22-68
+15    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+15-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:8:5-80
+15-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:8:22-77
+16    <uses-permission
+16-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:9:5-108
+17        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+17-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:9:22-78
+18        android:maxSdkVersion="28" />
+18-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:9:79-105
+19
+20    <permission
+20-->[androidx.core:core:1.13.0] /home/jiamengying/.gradle/caches/8.10/transforms/1cd72d536a4e9063aeb8ffe1cadbba33/transformed/core-1.13.0/AndroidManifest.xml:22:5-24:47
+21        android:name="com.p2pchat.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+21-->[androidx.core:core:1.13.0] /home/jiamengying/.gradle/caches/8.10/transforms/1cd72d536a4e9063aeb8ffe1cadbba33/transformed/core-1.13.0/AndroidManifest.xml:23:9-81
+22        android:protectionLevel="signature" />
+22-->[androidx.core:core:1.13.0] /home/jiamengying/.gradle/caches/8.10/transforms/1cd72d536a4e9063aeb8ffe1cadbba33/transformed/core-1.13.0/AndroidManifest.xml:24:9-44
+23
+24    <uses-permission android:name="com.p2pchat.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+24-->[androidx.core:core:1.13.0] /home/jiamengying/.gradle/caches/8.10/transforms/1cd72d536a4e9063aeb8ffe1cadbba33/transformed/core-1.13.0/AndroidManifest.xml:26:5-97
+24-->[androidx.core:core:1.13.0] /home/jiamengying/.gradle/caches/8.10/transforms/1cd72d536a4e9063aeb8ffe1cadbba33/transformed/core-1.13.0/AndroidManifest.xml:26:22-94
+25
+26    <application
+26-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:11:5-29:19
+27        android:allowBackup="true"
+27-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:12:9-35
+28        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+28-->[androidx.core:core:1.13.0] /home/jiamengying/.gradle/caches/8.10/transforms/1cd72d536a4e9063aeb8ffe1cadbba33/transformed/core-1.13.0/AndroidManifest.xml:28:18-86
+29        android:debuggable="true"
+30        android:extractNativeLibs="true"
+31        android:icon="@mipmap/ic_launcher"
+31-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:16:9-43
+32        android:label="P2P安全通信"
+32-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:13:9-32
+33        android:supportsRtl="true"
+33-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:14:9-35
+34        android:theme="@style/Theme.P2PChat"
+34-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:15:9-45
+35        android:usesCleartextTraffic="true" >
+35-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:17:9-44
+36        <activity
+36-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:19:9-28:20
+37            android:name="com.p2pchat.app.MainActivity"
+37-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:20:13-41
+38            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+38-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:22:13-87
+39            android:exported="true"
+39-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:21:13-36
+40            android:windowSoftInputMode="adjustResize" >
+40-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:23:13-55
+41            <intent-filter>
+41-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:24:13-27:29
+42                <action android:name="android.intent.action.MAIN" />
+42-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:25:17-69
+42-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:25:25-66
+43
+44                <category android:name="android.intent.category.LAUNCHER" />
+44-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:26:17-77
+44-->/home/jiamengying/opencode_task/chat/p2p-chat/android/app/src/main/AndroidManifest.xml:26:27-74
+45            </intent-filter>
+46        </activity>
+47
+48        <provider
+48-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+49            android:name="androidx.startup.InitializationProvider"
+49-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+50            android:authorities="com.p2pchat.app.androidx-startup"
+50-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+51            android:exported="false" >
+51-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+52            <meta-data
+52-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+53                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+53-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+54                android:value="androidx.startup" />
+54-->[androidx.emoji2:emoji2:1.3.0] /home/jiamengying/.gradle/caches/8.10/transforms/311bd90e50763cde1b56957b2f2b248a/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+55            <meta-data
+55-->[androidx.lifecycle:lifecycle-process:2.6.2] /home/jiamengying/.gradle/caches/8.10/transforms/3b606b024a8109693346fa4811d72627/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:29:13-31:52
+56                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+56-->[androidx.lifecycle:lifecycle-process:2.6.2] /home/jiamengying/.gradle/caches/8.10/transforms/3b606b024a8109693346fa4811d72627/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:30:17-78
+57                android:value="androidx.startup" />
+57-->[androidx.lifecycle:lifecycle-process:2.6.2] /home/jiamengying/.gradle/caches/8.10/transforms/3b606b024a8109693346fa4811d72627/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:31:17-49
+58            <meta-data
+58-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+59                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+59-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+60                android:value="androidx.startup" />
+60-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+61        </provider>
+62
+63        <receiver
+63-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+64            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+64-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+65            android:directBootAware="false"
+65-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+66            android:enabled="true"
+66-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+67            android:exported="true"
+67-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+68            android:permission="android.permission.DUMP" >
+68-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+69            <intent-filter>
+69-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+70                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+70-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+70-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+71            </intent-filter>
+72            <intent-filter>
+72-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+73                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+73-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+73-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+74            </intent-filter>
+75            <intent-filter>
+75-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+76                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+76-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+76-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+77            </intent-filter>
+78            <intent-filter>
+78-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+79                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+79-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+79-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/jiamengying/.gradle/caches/8.10/transforms/b84ec815bb4580afb49064b7babc4db6/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+80            </intent-filter>
+81        </receiver>
+82    </application>
+83
+84</manifest>
