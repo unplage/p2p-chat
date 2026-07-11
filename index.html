@@ -177,6 +177,9 @@
                     <span id="sendPercent">0%</span>
                 </div>
                 <div class="file-progress"><div class="file-progress-bar" id="sendBar" style="width:0%"></div></div>
+                <div style="text-align:right;margin-top:4px">
+                    <button onclick="cancelCurrentTransfer()" style="font-size:11px;padding:2px 8px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#999">取消传输</button>
+                </div>
             </div>
             <div id="fileQueueContainer" class="hidden" style="margin-top:12px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -272,11 +275,13 @@ let fileTransferState = {
 };
 let receiveHistory = []; // 最近接收完成文件 [{ name, size }]
 let _pendingFileStart = null; // 接收队列：正在接收时暂存下一个文件信息
+let _pendingFileQueue = [];    // 接收队列数组（支持多文件排队）
 
 // 文件发送滑动窗口状态
 let sendWindow = new Map();  // seq → { data: Uint8Array, retries, timer }
 let nextSendSeq = 0;
 let windowSize = 16;
+let sentAckSize = 0;         // 已确认字节数（用于进度条）
 let _rejectSend = null;      // 当前发送 Promise 的 reject，用于重试耗尽时通知
 let _roomId = null;          // 当前连接的房间号，用于自动重连
 let _isCreator = false;      // 是否创建者（影响重连策略）
@@ -533,10 +538,15 @@ function setupConnection(connection) {
                 case 'file-start': handleFileStart(msg.info); break;
                 case 'file-progress': updateSendProgress(msg.percent); break;
                 case 'file-end': if (fileTransferState.receiving) handleFileComplete(); break;
+                case 'file-error':
+                    addLog(`⚠️ 对方文件传输出错: ${msg.reason}`, 'error');
+                    fileTransferState.receiving = false;
+                    document.getElementById('receivingCard').style.display = 'none';
+                    break;
                 case 'chunk-ack-batch': {
                     const lastSeq = msg.lastSeq;
                     for (const [seq, entry] of sendWindow) {
-                        if (seq <= lastSeq) { clearTimeout(entry.timer); sendWindow.delete(seq); }
+                        if (seq <= lastSeq) { clearTimeout(entry.timer); sendWindow.delete(seq); sentAckSize += entry.data.length; }
                     }
                     break;
                 }
@@ -568,6 +578,7 @@ function setupConnection(connection) {
         document.getElementById('voiceBtn').disabled = true;
         document.getElementById('voiceMsgBtn').disabled = true;
         // 清空队列，停止发送
+        if (window._transferTimeout) { clearTimeout(window._transferTimeout); window._transferTimeout = null; }
         fileQueue = [];
         isFileSendingActive = false;
         updateFileQueueUI();
@@ -736,7 +747,7 @@ function updateFileQueueUI() {
             <div class="file-item-info">
                 <div class="file-item-name">${escapeHTML(entry.name)}</div>
                 <div class="file-item-meta">${formatSize(entry.size)} • ${statusIcon} ${statusText}</div>
-                ${isCurrent ? '<div class="file-progress"><div class="file-progress-bar" id="queueProgressBar" style="width:' + (document.getElementById('sendPercent')?.textContent || '0') + '"></div></div>' : ''}
+                ${isCurrent ? '<div class="file-progress"><div class="file-progress-bar" id="queueProgressBar" style="width:' + (parseInt(document.getElementById('sendPercent')?.textContent || '0')) + '%"></div></div>' : ''}
             </div>
             ${!isCurrent ? `<button onclick="cancelQueueFile(${entry.id})" style="font-size:16px;padding:4px 8px;border:none;background:transparent;cursor:pointer;color:#ccc">✕</button>` : ''}
         </div>`;
@@ -798,6 +809,18 @@ async function processFileQueue() {
     }
 }
 
+function cancelCurrentTransfer() {
+    if (!fileTransferState.sending) return;
+    fileTransferState.sending = false;
+    if (window._transferTimeout) { clearTimeout(window._transferTimeout); window._transferTimeout = null; }
+    for (const entry of sendWindow.values()) clearTimeout(entry.timer);
+    sendWindow.clear();
+    if (_rejectSend) { _rejectSend(new Error('用户取消')); _rejectSend = null; }
+    try { conn.send(JSON.stringify({ type: 'file-error', reason: '发送端取消传输' })); } catch(e) {}
+    addLog('已取消当前文件传输', 'system');
+    document.getElementById('sendProgress').classList.add('hidden');
+}
+
 function buildChunkPacket(seq, data) {
     const crc = crc32(data);
     const header = new ArrayBuffer(8);
@@ -818,6 +841,7 @@ function tryResendChunk(seq) {
         sendWindow.delete(seq);
         addLog(`分片 ${seq} 重传超限，文件传输失败`, 'error');
         fileTransferState.sending = false;
+        try { conn.send(JSON.stringify({ type: 'file-error', reason: '分片重传超过限制' })); } catch(e) {}
         if (_rejectSend) { _rejectSend(new Error('重传超限')); _rejectSend = null; }
         return;
     }
@@ -840,11 +864,36 @@ async function sendFileViaP2P(file) {
         document.getElementById('sendProgress').classList.remove('hidden');
         updateSendProgress(0);
 
+        // 空文件：直接完成
+        if (file.size === 0) {
+            conn.send(JSON.stringify({ type: 'file-start', info: { name: file.name, size: 0, type: file.type, chunks: 0 } }));
+            conn.send(JSON.stringify({ type: 'file-end' }));
+            updateSendProgress(100);
+            addLog(`文件 "${file.name}" 发送完成`, 'success');
+            fileTransferState.sending = false;
+            updateFileQueueUI();
+            setTimeout(() => document.getElementById('sendProgress').classList.add('hidden'), 500);
+            resolve();
+            return;
+        }
+
         const estimatedChunks = Math.ceil(file.size / CHUNK_SIZE);
         conn.send(JSON.stringify({ type: 'file-start', info: { name: file.name, size: file.size, type: file.type, chunks: estimatedChunks } }));
 
         sendWindow.clear();
         nextSendSeq = 0;
+        sentAckSize = 0;
+
+        // 传输超时保护（30 分钟上限）
+        let transferTimeout = setTimeout(() => {
+            if (fileTransferState.sending) {
+                fileTransferState.sending = false;
+                conn.send(JSON.stringify({ type: 'file-error', reason: '传输超时' }));
+                reject(new Error('传输超时'));
+                _rejectSend = null;
+            }
+        }, 30 * 60 * 1000);
+        window._transferTimeout = transferTimeout;
 
         let sentSize = 0, lastProgress = -1;
 
@@ -857,10 +906,11 @@ async function sendFileViaP2P(file) {
             while (pending.length < windowSize && !fileDone) {
                 const { done, value } = await reader.read();
                 if (done) { fileDone = true; break; }
-                const buf = value.buffer || value;
-                for (let off = 0; off < buf.byteLength; off += CHUNK_SIZE) {
-                    const slice = buf.slice(off, Math.min(off + CHUNK_SIZE, buf.byteLength));
-                    pending.push({ seq: nextSendSeq++, data: new Uint8Array(slice) });
+                // 正确提取视图中的实际字节（value 可能是共享缓冲池的视图）
+                const raw = value.buffer ? new Uint8Array(value.buffer, value.byteOffset, value.byteLength) : value;
+                for (let off = 0; off < raw.length; off += CHUNK_SIZE) {
+                    const end = Math.min(off + CHUNK_SIZE, raw.length);
+                    pending.push({ seq: nextSendSeq++, data: new Uint8Array(raw.slice(off, end)) });
                 }
             }
         }
@@ -871,6 +921,7 @@ async function sendFileViaP2P(file) {
             if (!isConnected || !fileTransferState.sending || !conn?.open) {
                 if (fileTransferState.sending) {
                     fileTransferState.sending = false;
+                    if (window._transferTimeout) { clearTimeout(window._transferTimeout); window._transferTimeout = null; }
                     reject(new Error('连接已断开'));
                 }
                 return;
@@ -888,8 +939,8 @@ async function sendFileViaP2P(file) {
                 await readMore();
             }
 
-            // 进度汇报
-            const pct = Math.round((sentSize / file.size) * 100);
+            // 进度汇报（按已确认字节计算，避免提前 100%）
+            const pct = file.size > 0 ? Math.round((sentAckSize / file.size) * 100) : 0;
             if (pct > lastProgress + 1) {
                 updateSendProgress(pct);
                 conn.send(JSON.stringify({ type: 'file-progress', percent: pct }));
@@ -898,6 +949,7 @@ async function sendFileViaP2P(file) {
 
             // 完成条件：文件读完 + 窗口清空
             if (fileDone && pending.length === 0 && sendWindow.size === 0) {
+                if (window._transferTimeout) { clearTimeout(window._transferTimeout); window._transferTimeout = null; }
                 conn.send(JSON.stringify({ type: 'file-end' }));
                 updateSendProgress(100);
                 addLog(`文件 "${file.name}" 发送完成`, 'success');
@@ -917,10 +969,15 @@ async function sendFileViaP2P(file) {
     });
 }
 
+// 文件名净化
+function sanitizeName(name) {
+    return name.replace(/[\/\\\0<>:"|?*\x00-\x1f]/g, '_').substring(0, 240);
+}
+
 // 接收文件开始
 async function handleFileStart(info) {
     if (fileTransferState.receiving) {
-        _pendingFileStart = info;
+        _pendingFileQueue.push(info);
         return;
     }
     fileTransferState.receiving = true;
@@ -928,6 +985,9 @@ async function handleFileStart(info) {
     fileTransferState.receivedChunks = new Map();
     fileTransferState.receivedCount = 0;
     fileTransferState.receivedSize = 0;
+    fileTransferState._lastCumulAck = -1;
+    fileTransferState._lastSentAck = -1;
+    fileTransferState._nextStreamSeq = 0;
     fileTransferState.useStream = false;
     fileTransferState.writable = null;
     lastUIUpdate = 0;
@@ -937,7 +997,7 @@ async function handleFileStart(info) {
     try {
         const ext = info.name.includes('.') ? info.name.split('.').pop() : 'file';
         const handle = await window.showSaveFilePicker({
-            suggestedName: info.name,
+            suggestedName: sanitizeName(info.name),
             types: [{ description: 'File', accept: { 'application/octet-stream': ['.' + ext] } }]
         });
         fileTransferState.writable = await handle.createWritable();
@@ -970,8 +1030,6 @@ function handleFileChunk(chunk) {
     }
 
     // 累计 ACK：增量 ≥10 或最后一片时发送
-    if (fileTransferState._lastCumulAck === undefined) fileTransferState._lastCumulAck = -1;
-    if (fileTransferState._lastSentAck === undefined) fileTransferState._lastSentAck = -1;
     if (seq === fileTransferState._lastCumulAck + 1) {
         fileTransferState._lastCumulAck = seq;
         while (fileTransferState.receivedChunks.has(fileTransferState._lastCumulAck + 1)) {
@@ -981,7 +1039,20 @@ function handleFileChunk(chunk) {
 
     const now = Date.now();
     if (fileTransferState.useStream && fileTransferState.writable) {
-        fileTransferState.writable.write(data).catch(() => {});
+        // 流式写入：仅按顺序写入，乱序分片暂存到 Map
+        if (seq === fileTransferState._nextStreamSeq) {
+            fileTransferState.writable.write(data).catch(() => {});
+            fileTransferState._nextStreamSeq++;
+            // 写入后续连续分片
+            while (fileTransferState.receivedChunks.has(fileTransferState._nextStreamSeq)) {
+                const next = fileTransferState.receivedChunks.get(fileTransferState._nextStreamSeq);
+                fileTransferState.receivedChunks.delete(fileTransferState._nextStreamSeq);
+                fileTransferState.writable.write(next).catch(() => {});
+                fileTransferState._nextStreamSeq++;
+            }
+        } else if (!fileTransferState.receivedChunks.has(seq)) {
+            fileTransferState.receivedChunks.set(seq, data);
+        }
         fileTransferState.receivedSize += data.length;
         fileTransferState.receivedCount++;
         if (now - lastUIUpdate > UI_UPDATE_INTERVAL) {
@@ -1008,8 +1079,20 @@ function handleFileChunk(chunk) {
 // 文件接收完成
 async function handleFileComplete() {
     if (!fileTransferState.receiving) return;
-    const name = fileTransferState.fileInfo.name;
-    const size = fileTransferState.fileInfo.size;
+    const info = fileTransferState.fileInfo;
+    const name = sanitizeName(info.name);
+    const size = info.size;
+
+    // 校验分片完整性
+    if (info.chunks > 0 && (fileTransferState.receivedCount !== info.chunks || fileTransferState.receivedSize !== info.size)) {
+        addLog(`文件 ${name} 接收不完整 (${fileTransferState.receivedCount}/${info.chunks} 片, ${formatSize(fileTransferState.receivedSize)}/${formatSize(info.size)})`, 'error');
+        fileTransferState.receiving = false;
+        fileTransferState.receivedChunks = null;
+        fileTransferState.receivedCount = 0;
+        fileTransferState.receivedSize = 0;
+        _pendingFileQueue = [];
+        return;
+    }
 
     if (fileTransferState.useStream && fileTransferState.writable) {
         try {
@@ -1047,10 +1130,8 @@ async function handleFileComplete() {
     fileTransferState.receivedCount = 0;
     fileTransferState.receivedSize = 0;
     // 处理下一个排队文件
-    if (_pendingFileStart) {
-        const next = _pendingFileStart;
-        _pendingFileStart = null;
-        handleFileStart(next);
+    if (_pendingFileQueue.length > 0) {
+        handleFileStart(_pendingFileQueue.shift());
     } else {
         setTimeout(() => document.getElementById('receivingCard').style.display = 'none', 3000);
     }
@@ -1087,7 +1168,8 @@ function updateSendProgress(percent) {
 }
 
 function updateReceiveProgress() {
-    const percent = Math.round((fileTransferState.receivedSize / fileTransferState.fileInfo.size) * 100);
+    const total = fileTransferState.fileInfo.size;
+    const percent = total > 0 ? Math.round((fileTransferState.receivedSize / total) * 100) : 100;
     const bar = document.querySelector('#receivingList .file-progress-bar');
     if (bar) bar.style.width = percent + '%';
     const meta = document.querySelector('#receivingList .file-item-meta');
