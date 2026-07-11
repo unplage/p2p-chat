@@ -178,10 +178,18 @@
                 </div>
                 <div class="file-progress"><div class="file-progress-bar" id="sendBar" style="width:0%"></div></div>
             </div>
+            <div id="fileQueueContainer" class="hidden" style="margin-top:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span style="font-size:13px;color:#666" id="queueCount">发送队列 (0 个文件)</span>
+                    <button onclick="clearFileQueue()" style="font-size:12px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:transparent;cursor:pointer;color:#999">清空队列</button>
+                </div>
+                <div class="file-list" id="fileQueueList"></div>
+            </div>
         </div>
-        <div class="vault-card hidden" id="receivingCard">
-            <div class="vault-title">📥 正在接收</div>
+        <div class="vault-card" id="receivingCard" style="display:none">
+            <div class="vault-title">📥 接收文件</div>
             <div class="file-list" id="receivingList"></div>
+            <div id="receiveHistory" style="margin-top:8px"></div>
         </div>
     </div>
 </div>
@@ -262,6 +270,8 @@ let fileTransferState = {
     writable: null,
     useStream: false
 };
+let receiveHistory = []; // 最近接收完成文件 [{ name, size }]
+let _pendingFileStart = null; // 接收队列：正在接收时暂存下一个文件信息
 
 // 文件发送滑动窗口状态
 let sendWindow = new Map();  // seq → { data: Uint8Array, retries, timer }
@@ -270,8 +280,9 @@ let windowSize = 16;
 let _rejectSend = null;      // 当前发送 Promise 的 reject，用于重试耗尽时通知
 
 // 批量发送队列相关变量
-let fileQueue = [];            // 待发送文件队列
+let fileQueue = [];            // 待发送文件队列 [{ file, name, size }]
 let isFileSendingActive = false; // 是否正在发送队列中的文件
+let fileQueueIdCounter = 0;
 
 let CHUNK_SIZE = 16384;        // 动态分片大小，可变
 const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
@@ -365,6 +376,7 @@ function cancelWaiting() {
     // 清空队列
     fileQueue = [];
     isFileSendingActive = false;
+    updateFileQueueUI?.();
     resetRoomModal();
 }
 
@@ -493,6 +505,7 @@ function setupConnection(connection) {
         // 清空队列，停止发送
         fileQueue = [];
         isFileSendingActive = false;
+        updateFileQueueUI();
         fileTransferState.sending = false;
         fileTransferState.receiving = false;
         // 清理滑动窗口
@@ -601,17 +614,16 @@ function addFilesToQueue(files) {
     }
     if (!files || files.length === 0) return;
     
-    // 将文件转换为数组并加入队列
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.size > MAX_FILE_SIZE) {
             addLog(`跳过文件 "${file.name}"：超过 10GB 限制`, 'warning');
             continue;
         }
-        fileQueue.push(file);
+        fileQueue.push({ id: ++fileQueueIdCounter, file, name: file.name, size: file.size });
     }
     
-    // 启动队列处理（如果尚未启动）
+    updateFileQueueUI();
     if (!isFileSendingActive) {
         processFileQueue();
     } else {
@@ -619,33 +631,84 @@ function addFilesToQueue(files) {
     }
 }
 
+function updateFileQueueUI() {
+    const container = document.getElementById('fileQueueContainer');
+    const list = document.getElementById('fileQueueList');
+    const count = document.getElementById('queueCount');
+    if (!container) return;
+    if (fileQueue.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    count.textContent = `发送队列 (${fileQueue.length} 个文件)`;
+    list.innerHTML = fileQueue.map((entry, idx) => {
+        const isCurrent = idx === 0 && isFileSendingActive;
+        const statusText = isCurrent ? '发送中' : '排队中';
+        const statusIcon = isCurrent ? '📤' : '⏳';
+        return `<div class="file-item">
+            <div class="file-item-icon">📄</div>
+            <div class="file-item-info">
+                <div class="file-item-name">${escapeHTML(entry.name)}</div>
+                <div class="file-item-meta">${formatSize(entry.size)} • ${statusIcon} ${statusText}</div>
+                ${isCurrent ? '<div class="file-progress"><div class="file-progress-bar" id="queueProgressBar" style="width:' + (document.getElementById('sendPercent')?.textContent || '0') + '"></div></div>' : ''}
+            </div>
+            ${!isCurrent ? `<button onclick="cancelQueueFile(${entry.id})" style="font-size:16px;padding:4px 8px;border:none;background:transparent;cursor:pointer;color:#ccc">✕</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function cancelQueueFile(id) {
+    const idx = fileQueue.findIndex(e => e.id === id);
+    if (idx === -1 || idx === 0) return; // 不能取消正在发送的
+    const entry = fileQueue[idx];
+    addLog(`已取消: ${entry.name}`, 'system');
+    fileQueue.splice(idx, 1);
+    updateFileQueueUI();
+}
+
+function clearFileQueue() {
+    if (fileQueue.length === 0) return;
+    if (isFileSendingActive) {
+        fileQueue = [fileQueue[0]]; // 只保留当前发送中的
+        addLog('已清空队列中剩余文件', 'system');
+    } else {
+        fileQueue = [];
+        addLog('已清空发送队列', 'system');
+    }
+    updateFileQueueUI();
+}
+
 // 处理队列中的文件
 async function processFileQueue() {
     if (fileQueue.length === 0) {
         isFileSendingActive = false;
-        // 恢复发送进度区域显示默认文本
+        updateFileQueueUI();
         const statusSpan = document.getElementById('sendStatusText');
         if (statusSpan) statusSpan.textContent = '传输中...';
         return;
     }
     
     isFileSendingActive = true;
-    const file = fileQueue.shift();
-    
-    // 更新状态文本
+    const entry = fileQueue[0];
+    const file = entry.file;
+    updateFileQueueUI();
+
     const statusSpan = document.getElementById('sendStatusText');
     if (statusSpan) {
-        statusSpan.textContent = `📤 发送: ${file.name} (剩余 ${fileQueue.length} 个)`;
+        statusSpan.textContent = `📤 发送: ${file.name} (剩余 ${fileQueue.length - 1} 个)`;
     }
-    addLog(`📤 正在发送: ${file.name} (剩余 ${fileQueue.length} 个文件)`, 'system');
+    addLog(`📤 正在发送: ${file.name} (剩余 ${fileQueue.length - 1} 个文件)`, 'system');
     
     try {
         await sendFileViaP2P(file);
-        // 发送成功，继续下一个
+        fileQueue.shift();
+        updateFileQueueUI();
         processFileQueue();
     } catch (err) {
         addLog(`发送 ${file.name} 失败，已跳过`, 'error');
-        // 即使失败也继续处理下一个
+        fileQueue.shift();
+        updateFileQueueUI();
         processFileQueue();
     }
 }
@@ -698,8 +761,6 @@ async function sendFileViaP2P(file) {
         sendWindow.clear();
         nextSendSeq = 0;
 
-        let chunkSize = CHUNK_SIZE;
-        let throughputBytes = 0, throughputSamples = 0, throughputTimer = Date.now();
         let sentSize = 0, lastProgress = -1;
 
         const stream = file.stream();
@@ -712,8 +773,8 @@ async function sendFileViaP2P(file) {
                 const { done, value } = await reader.read();
                 if (done) { fileDone = true; break; }
                 const buf = value.buffer || value;
-                for (let off = 0; off < buf.byteLength; off += chunkSize) {
-                    const slice = buf.slice(off, Math.min(off + chunkSize, buf.byteLength));
+                for (let off = 0; off < buf.byteLength; off += CHUNK_SIZE) {
+                    const slice = buf.slice(off, Math.min(off + CHUNK_SIZE, buf.byteLength));
                     pending.push({ seq: nextSendSeq++, data: new Uint8Array(slice) });
                 }
             }
@@ -738,21 +799,7 @@ async function sendFileViaP2P(file) {
                     data: chunk.data, retries: 0,
                     timer: setTimeout(() => tryResendChunk(chunk.seq), 3000)
                 });
-                throughputBytes += chunk.data.length;
                 sentSize += chunk.data.length;
-                throughputSamples++;
-
-                // 每 50 个分片调整动态分片大小
-                if (throughputSamples >= 50) {
-                    const elapsed = (Date.now() - throughputTimer) / 1000;
-                    if (elapsed > 0) {
-                        const rate = throughputBytes / elapsed;
-                        if (rate > 10 * 1024 * 1024) chunkSize = Math.min(chunkSize * 2, 262144);
-                        else if (rate > 2 * 1024 * 1024) chunkSize = Math.min(chunkSize * 1.5, 65536);
-                        else if (rate < 500 * 1024) chunkSize = Math.max(Math.floor(chunkSize / 2), 4096);
-                    }
-                    throughputBytes = 0; throughputSamples = 0; throughputTimer = Date.now();
-                }
                 await readMore();
             }
 
@@ -770,6 +817,7 @@ async function sendFileViaP2P(file) {
                 updateSendProgress(100);
                 addLog(`文件 "${file.name}" 发送完成`, 'success');
                 fileTransferState.sending = false;
+                updateFileQueueUI();
                 if (fileQueue.length === 0) {
                     setTimeout(() => document.getElementById('sendProgress').classList.add('hidden'), 2000);
                 }
@@ -786,6 +834,10 @@ async function sendFileViaP2P(file) {
 
 // 接收文件开始
 async function handleFileStart(info) {
+    if (fileTransferState.receiving) {
+        _pendingFileStart = info;
+        return;
+    }
     fileTransferState.receiving = true;
     fileTransferState.fileInfo = info;
     fileTransferState.receivedChunks = new Map();
@@ -832,8 +884,9 @@ function handleFileChunk(chunk) {
         return;
     }
 
-    // 累计 ACK：每 10 个分片或最后一片发送一次
+    // 累计 ACK：增量 ≥10 或最后一片时发送
     if (fileTransferState._lastCumulAck === undefined) fileTransferState._lastCumulAck = -1;
+    if (fileTransferState._lastSentAck === undefined) fileTransferState._lastSentAck = -1;
     if (seq === fileTransferState._lastCumulAck + 1) {
         fileTransferState._lastCumulAck = seq;
         while (fileTransferState.receivedChunks.has(fileTransferState._lastCumulAck + 1)) {
@@ -843,7 +896,6 @@ function handleFileChunk(chunk) {
 
     const now = Date.now();
     if (fileTransferState.useStream && fileTransferState.writable) {
-        // 流式写入磁盘，不保留内存引用
         fileTransferState.writable.write(data).catch(() => {});
         fileTransferState.receivedSize += data.length;
         fileTransferState.receivedCount++;
@@ -851,11 +903,7 @@ function handleFileChunk(chunk) {
             updateReceiveProgress();
             lastUIUpdate = now;
         }
-        if (fileTransferState.receivedCount >= fileTransferState.fileInfo.chunks) {
-            handleFileComplete();
-        }
     } else if (!fileTransferState.receivedChunks.has(seq)) {
-        // Map 降级模式
         fileTransferState.receivedChunks.set(seq, data);
         fileTransferState.receivedSize += data.length;
         fileTransferState.receivedCount++;
@@ -863,50 +911,78 @@ function handleFileChunk(chunk) {
             updateReceiveProgress();
             lastUIUpdate = now;
         }
-        if (fileTransferState.receivedCount >= fileTransferState.fileInfo.chunks) {
-            handleFileComplete();
-        }
     }
-    // 批量 ACK：每 10 片或最后一片时发送累计确认
-    if (fileTransferState._lastCumulAck % 10 === 0 || fileTransferState._lastCumulAck === fileTransferState.fileInfo.chunks - 1) {
+    // 批量 ACK：累计增量 ≥10 或最后一片时发送
+    if (fileTransferState._lastCumulAck - fileTransferState._lastSentAck >= 10 ||
+        fileTransferState._lastCumulAck === fileTransferState.fileInfo.chunks - 1) {
         conn.send(JSON.stringify({ type: 'chunk-ack-batch', lastSeq: fileTransferState._lastCumulAck }));
+        fileTransferState._lastSentAck = fileTransferState._lastCumulAck;
     }
 }
 
 // 文件接收完成
 async function handleFileComplete() {
     if (!fileTransferState.receiving) return;
+    const name = fileTransferState.fileInfo.name;
+    const size = fileTransferState.fileInfo.size;
 
     if (fileTransferState.useStream && fileTransferState.writable) {
         try {
             await fileTransferState.writable.close();
-            addLog(`文件接收完成: ${fileTransferState.fileInfo.name}`, 'success');
+            addLog(`文件接收完成: ${name}`, 'success');
         } catch (e) {
             addLog(`文件写入失败: ${e.message}`, 'error');
         }
         fileTransferState.writable = null;
     } else {
-        // Map → Blob 降级
         const sorted = [...fileTransferState.receivedChunks.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]);
         const blob = new Blob(sorted, { type: fileTransferState.fileInfo.type });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = fileTransferState.fileInfo.name;
+        a.download = name;
         a.click();
-        addLog(`文件接收完成: ${fileTransferState.fileInfo.name}`, 'success');
+        addLog(`文件接收完成: ${name}`, 'success');
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
+
+    // 标记当前文件为已完成
+    const meta = document.querySelector('#receivingList .file-item-meta');
+    if (meta) meta.textContent = `${formatSize(size)} • ✓ 已完成`;
+    const bar = document.querySelector('#receivingList .file-progress-bar');
+    if (bar) bar.style.width = '100%';
+
+    // 记录历史
+    receiveHistory.unshift({ name, size });
+    if (receiveHistory.length > 5) receiveHistory.pop();
+    updateReceiveHistory();
 
     fileTransferState.receiving = false;
     fileTransferState.receivedChunks = null;
     fileTransferState.receivedCount = 0;
     fileTransferState.receivedSize = 0;
-    setTimeout(() => document.getElementById('receivingCard').classList.add('hidden'), 1000);
+    // 处理下一个排队文件
+    if (_pendingFileStart) {
+        const next = _pendingFileStart;
+        _pendingFileStart = null;
+        handleFileStart(next);
+    } else {
+        setTimeout(() => document.getElementById('receivingCard').style.display = 'none', 3000);
+    }
+}
+
+function updateReceiveHistory() {
+    const el = document.getElementById('receiveHistory');
+    if (!el) return;
+    if (receiveHistory.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div style="font-size:12px;color:#999;margin-bottom:4px">最近接收:</div>' +
+        receiveHistory.map(h =>
+            `<div style="font-size:12px;color:#666;padding:2px 0">✅ ${escapeHTML(h.name)} (${formatSize(h.size)})</div>`
+        ).join('');
 }
 
 function showReceivingFile(info) {
-    document.getElementById('receivingCard').classList.remove('hidden');
+    document.getElementById('receivingCard').style.display = '';
     const list = document.getElementById('receivingList');
     list.innerHTML = `
         <div class="file-item">
