@@ -278,6 +278,10 @@ let sendWindow = new Map();  // seq → { data: Uint8Array, retries, timer }
 let nextSendSeq = 0;
 let windowSize = 16;
 let _rejectSend = null;      // 当前发送 Promise 的 reject，用于重试耗尽时通知
+let _roomId = null;          // 当前连接的房间号，用于自动重连
+let _isCreator = false;      // 是否创建者（影响重连策略）
+let _reconnectAttempts = 0;
+let _reconnectTimer = null;
 
 // 批量发送队列相关变量
 let fileQueue = [];            // 待发送文件队列 [{ file, name, size }]
@@ -364,6 +368,9 @@ function resetRoomModal() {
 }
 
 function cancelWaiting() {
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+    _reconnectAttempts = 0;
+    _roomId = null;
     if (peer) { peer.destroy(); peer = null; }
     conn = null;
     isConnected = false;
@@ -380,10 +387,64 @@ function cancelWaiting() {
     resetRoomModal();
 }
 
+function startReconnect() {
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+    if (!_roomId || isInCall || _reconnectAttempts >= 5) {
+        _reconnectAttempts = 0;
+        addLog('自动重连已达上限，请手动重新连接 ⚙️', 'error');
+        return;
+    }
+    _reconnectAttempts++;
+    const delay = Math.min(2000 * Math.pow(1.5, _reconnectAttempts - 1), 8000);
+    addLog(`⏳ 连接断开，${delay/1000}秒后自动重连 (${_reconnectAttempts}/5)...`, 'system');
+    _reconnectTimer = setTimeout(() => {
+        _reconnectTimer = null;
+        if (isConnected) return;
+        if (peer) { try { peer.destroy(); } catch(e) {} peer = null; }
+        conn = null;
+        if (_isCreator) {
+            peer = new Peer(_roomId, peerOptions);
+            peer.on('open', (id) => {
+                addLog(`✅ 已重新上线 (${_roomId})，等待对方连接...`, 'success');
+                document.getElementById('myPeerId').textContent = id;
+                document.getElementById('myPeerIdDisplay').classList.remove('hidden');
+            });
+            peer.on('connection', (incomingConn) => {
+                conn = incomingConn;
+                setupConnection(conn);
+                addLog('🔗 对方已重新连接', 'success');
+                _reconnectAttempts = 0;
+            });
+            peer.on('error', (err) => {
+                if (isConnected) return;
+                startReconnect();
+            });
+        } else {
+            peer = new Peer(peerOptions);
+            peer.on('open', () => {
+                const newConn = peer.connect(_roomId);
+                if (!newConn) { startReconnect(); return; }
+                conn = newConn;
+                setupConnection(conn);
+                conn.on('open', () => {
+                    addLog('🔗 已重新连接到房间', 'success');
+                    _reconnectAttempts = 0;
+                });
+            });
+            peer.on('error', () => {
+                if (!isConnected) startReconnect();
+            });
+        }
+    }, delay);
+}
+
 // ==================== 房间机制 ====================
 function createRoom() {
     const roomId = document.getElementById('roomIdInput').value.trim();
     if (!roomId) return alert('请输入房间号');
+    _roomId = roomId;
+    _isCreator = true;
+    _reconnectAttempts = 0;
     peer = new Peer(roomId, peerOptions);
     peer.on('open', (id) => {
         addLog(`房间创建成功，你的ID: ${id}`, 'success');
@@ -394,6 +455,7 @@ function createRoom() {
     });
     peer.on('connection', (incomingConn) => { conn = incomingConn; setupConnection(conn); });
     peer.on('error', (err) => {
+        if (isConnected) { addLog(`Peer错误(已连接，忽略): ${err.message}`, 'system'); return; }
         addLog(`Peer错误: ${err.type} - ${err.message}`, 'error');
         if (err.type === 'unavailable-id') alert('该房间号已被占用，请换一个');
         else alert('连接失败: ' + err.message);
@@ -403,8 +465,11 @@ function createRoom() {
 }
 
 function joinRoom() {
-    const roomId = document.getElementById('roomIdInput').value.trim();
+    const roomId = (arguments.length > 0 && arguments[0]) || document.getElementById('roomIdInput').value.trim();
     if (!roomId) return alert('请输入房间号');
+    _roomId = roomId;
+    _isCreator = false;
+    _reconnectAttempts = 0;
     peer = new Peer(peerOptions);
     peer.on('open', (myId) => {
         addLog(`已连接到网络，我的临时ID: ${myId}`, 'system');
@@ -527,11 +592,31 @@ function setupConnection(connection) {
             clearTimeout(heartbeatTimeout);
             heartbeatTimeout = null;
         }
+        // 尝试自动重连
+        startReconnect();
     });
     conn.on('error', (err) => {
         addLog('数据连接错误: ' + err, 'error');
         if (isConnected && conn) { conn.close(); }
     });
+    // 数据通道 ICE 状态监控（依赖 PeerJS 内部 _pc）
+    const monitorIce = () => {
+        const pc = connection._pc;
+        if (!pc || pc.connectionState === 'closed') return;
+        pc.oniceconnectionstatechange = () => {
+            if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+                addLog('⚠️ 数据通道 ICE 断开，尝试恢复...', 'warning');
+                pc.restartIce();
+            }
+        };
+        pc.onconnectionstatechange = () => {
+            if (pc.connectionState === 'failed') {
+                addLog('⚠️ 数据通道连接失败，尝试 ICE 重启...', 'warning');
+                try { pc.restartIce(); } catch(e) {}
+            }
+        };
+    };
+    try { monitorIce(); } catch(e) {}
 }
 
 // ==================== 心跳检测 ====================
