@@ -124,6 +124,18 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/index.html");
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        webView.evaluateJavascript("typeof onAppPause === 'function' && onAppPause()", null);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        webView.evaluateJavascript("typeof onAppResume === 'function' && onAppResume()", null);
+    }
+
     public class FileSaver {
         @JavascriptInterface
         public void saveFile(String filename, String base64Data) {

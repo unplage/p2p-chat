@@ -117,8 +117,7 @@
         .peer-id-display { background:#f0f0f0; padding:10px; border-radius:8px; font-family:monospace; word-break:break-all; margin:10px 0; }
         .spinner { margin:20px auto; width:40px;height:40px;border:4px solid #f3f3f3;border-top:4px solid var(--primary);border-radius:50%;animation:spin 1s linear infinite; }
         @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
-    .stats-bar { position:fixed; top:max(52px,var(--safe-top)); left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:#fff; padding:4px 12px; border-radius:20px; font-size:11px; z-index:999; white-space:nowrap; display:none; backdrop-filter:blur(8px); font-family:monospace; pointer-events:none; }
-        .stats-bar.active { display:block; }
+
     </style>
 </head>
 <body>
@@ -200,7 +199,6 @@
 <div class="call-overlay" id="callOverlay">
     <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
     <div class="local-pip"><video id="localVideo" autoplay playsinline muted></video></div>
-    <div class="stats-bar" id="statsPanel"></div>
     <div class="call-controls">
         <button class="call-btn" style="background:rgba(255,255,255,0.2)" id="muteBtn" onclick="toggleMute()">🎤</button>
         <button class="call-btn hangup" onclick="hangup()">📞</button>
@@ -321,6 +319,9 @@ let recordingStartTime = 0;
 
 // 屏幕唤醒锁
 let wakeLock = null;
+
+// 后台通话视频轨道替换
+let dummyVideoTrack = null;
 
 // ==================== 心跳检测相关 ====================
 let heartbeatInterval = null;
@@ -1108,7 +1109,7 @@ async function handleFileComplete() {
         if (typeof Android !== 'undefined' && Android.saveFile) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                const b64 = e.target.result.split(',')[1];
+                const b64 = e.target.result.split(',')[1].replace(/\s/g, '');
                 Android.saveFile(name, b64);
             };
             reader.readAsDataURL(blob);
@@ -1469,40 +1470,67 @@ function enableAudioFec(pc) {
 }
 
 function startStatsMonitor(pc) {
-    const el = document.getElementById('statsPanel');
-    if (!el) return;
-    clearInterval(el._monitorInterval);
-    el._monitorInterval = setInterval(async () => {
-        if (!pc || pc.connectionState !== 'connected' || !isInCall) {
-            el.classList.remove('active');
-            return;
-        }
-        el.classList.add('active');
-        try {
-            const stats = await pc.getStats();
-            let rtt = '-', lossRate = '0%', transportType = '-', sendBw = '-', localCandidateId = null;
-            stats.forEach(r => {
-                if (r.type === 'candidate-pair' && r.state === 'succeeded') {
-                    rtt = (r.currentRoundTripTime * 1000).toFixed(0) + 'ms';
-                    if (r.availableOutgoingBitrate) sendBw = (r.availableOutgoingBitrate / 1000).toFixed(0) + 'kbps';
-                    localCandidateId = r.localCandidateId;
-                }
-                if (r.type === 'inbound-rtp' && r.kind === 'video') {
-                    const total = (r.packetsLost || 0) + (r.packetsReceived || 0);
-                    lossRate = total > 0 ? ((r.packetsLost || 0) / total * 100).toFixed(1) + '%' : '0%';
-                }
-            });
-            if (localCandidateId) {
-                stats.forEach(r => {
-                    if (r.type === 'local-candidate' && r.id === localCandidateId && r.candidateType) {
-                        transportType = r.candidateType;
-                    }
-                });
-            }
-            el.textContent = `📊 ${transportType} | RTT ${rtt} | 丢包 ${lossRate} | ${sendBw}`;
-        } catch (e) { /* 静默 */ }
-    }, 2000);
+    // 已移除
 }
+
+// ==================== 后台视频轨道替换 ====================
+function createDummyVideoTrack() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, 2, 2);
+    const stream = canvas.captureStream(1);
+    return stream.getVideoTracks()[0];
+}
+
+function onAppPause() {
+    if (!isInCall || !localStream) return;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+    dummyVideoTrack = createDummyVideoTrack();
+    videoTrack.stop();
+    localStream.removeTrack(videoTrack);
+    localStream.addTrack(dummyVideoTrack);
+    if (currentCall) {
+        const pc = currentCall._pc || currentCall.peerConnection;
+        if (pc) {
+            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) sender.replaceTrack(dummyVideoTrack);
+        }
+    }
+}
+
+async function onAppResume() {
+    if (!isInCall || !dummyVideoTrack) return;
+    try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, frameRate: { ideal: 30 } },
+            audio: false
+        });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        if (currentCall) {
+            const pc = currentCall._pc || currentCall.peerConnection;
+            if (pc) {
+                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) await sender.replaceTrack(newVideoTrack);
+            }
+        }
+        localStream.removeTrack(dummyVideoTrack);
+        localStream.addTrack(newVideoTrack);
+        document.getElementById('localVideo').srcObject = localStream;
+        dummyVideoTrack.stop();
+        dummyVideoTrack = null;
+    } catch (e) {
+        console.error('恢复摄像头失败:', e);
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) onAppPause();
+    else onAppResume();
+});
 
 // ==================== 音视频通话 ====================
 async function startCall(type) {
@@ -1555,7 +1583,6 @@ async function startCall(type) {
             setupIceStateHandler(pc);
             enableAudioFec(pc);
             startAdaptiveBitrate(pc);
-            startStatsMonitor(pc);
         }
 
         call.on('stream', (remoteStream) => {
@@ -1654,7 +1681,6 @@ function handleIncomingCall(call) {
                 setupIceStateHandler(pc);
                 enableAudioFec(pc);
                 startAdaptiveBitrate(pc);
-                startStatsMonitor(pc);
             }
             
             call.on('stream', (remoteStream) => {
@@ -1721,9 +1747,6 @@ function cleanupCall() {
         }
     }
     
-    const sp = document.getElementById('statsPanel');
-    if (sp) { clearInterval(sp._monitorInterval); sp.classList.remove('active'); }
-
     isInCall = false;
     currentCall = null;
     document.getElementById('callBtn').disabled = false;
