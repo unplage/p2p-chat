@@ -95,6 +95,8 @@
         .call-controls { position:absolute; bottom:max(40px, var(--safe-bottom)); left:50%; transform:translateX(-50%); display:flex; gap:24px; background:rgba(0,0,0,0.6); padding:16px 24px; border-radius:40px; }
         .call-btn { width:56px; height:56px; border-radius:50%; border:none; font-size:24px; color:white; cursor:pointer; }
         .call-btn.hangup { background:var(--danger); }
+        .pip-mode .call-overlay .call-controls,
+        .pip-mode .call-overlay .local-pip { display:none !important; }
         .modal { position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:2000; display:none; align-items:flex-end; justify-content:center; }
         .modal.active { display:flex; }
         .modal-content { background:white; width:100%; max-height:90vh; border-radius:20px 20px 0 0; overflow:hidden; }
@@ -320,6 +322,10 @@ let recordingStartTime = 0;
 
 // 屏幕唤醒锁
 let wakeLock = null;
+// PiP & 轨道交换 fallback
+let _isInPip = false;
+let _savedVideoTrack = null;
+let _backgroundCanvasTrack = null;
 
 // ==================== 心跳检测相关 ====================
 let heartbeatInterval = null;
@@ -1523,12 +1529,46 @@ function startStatsMonitor(pc) {
     // 已移除
 }
 
-// ==================== 后台不释放摄像头/麦克风 ====================
+// ==================== 后台视频处理 ====================
 function onAppPause() {
-    // 切到后台时保持摄像头和麦克风运行，不释放
+    if (_isInPip || !isInCall || !localStream) return;
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (!videoTrack || videoTrack.readyState !== 'live') return;
+    _savedVideoTrack = videoTrack;
+    const canvas = document.createElement('canvas');
+    canvas.width = 2; canvas.height = 2;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, 2, 2);
+    _backgroundCanvasTrack = canvas.captureStream(1).getVideoTracks()[0];
+    const pc = currentCall && (currentCall._pc || currentCall.peerConnection);
+    if (pc) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(_backgroundCanvasTrack).catch(() => {});
+    }
 }
 async function onAppResume() {
-    // 切回前台无需重新获取媒体设备
+    if (!_savedVideoTrack || !_backgroundCanvasTrack) return;
+    const pc = currentCall && (currentCall._pc || currentCall.peerConnection);
+    if (pc) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(_savedVideoTrack).catch(() => {});
+    }
+    if (localStream) {
+        const oldTrack = localStream.getVideoTracks()[0];
+        if (oldTrack && oldTrack !== _savedVideoTrack) {
+            localStream.removeTrack(oldTrack);
+            localStream.addTrack(_savedVideoTrack);
+        }
+        document.getElementById('localVideo').srcObject = localStream;
+    }
+    _backgroundCanvasTrack.stop();
+    _backgroundCanvasTrack = null;
+    _savedVideoTrack = null;
+}
+function onPiPChanged(isInPip) {
+    _isInPip = isInPip;
+    document.body.classList.toggle('pip-mode', isInPip);
 }
 
 // ==================== 音视频通话 ====================

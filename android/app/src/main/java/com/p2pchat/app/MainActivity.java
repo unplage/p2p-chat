@@ -42,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private String currentFilename;
     private Uri currentUri;
     private File currentFile;
+    private boolean isInCall = false;
+    private boolean enteringPip = false;
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 300;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -131,13 +134,38 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        webView.evaluateJavascript("typeof onAppPause === 'function' && onAppPause()", null);
+        if (!enteringPip) {
+            webView.evaluateJavascript("typeof onAppPause === 'function' && onAppPause()", null);
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         webView.evaluateJavascript("typeof onAppResume === 'function' && onAppResume()", null);
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (isInCall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            enteringPip = true;
+            enterPictureInPictureMode();
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        }
+        enteringPip = false;
+        webView.post(() ->
+            webView.evaluateJavascript(
+                "typeof onPiPChanged === 'function' && onPiPChanged(" + isInPictureInPictureMode + ")",
+                null
+            )
+        );
     }
 
     public class FileSaver {
@@ -220,17 +248,31 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void startCallService() {
-            Intent intent = new Intent(MainActivity.this, CallForegroundService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent);
-            } else {
-                startService(intent);
-            }
+            try {
+                isInCall = true;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(MainActivity.this,
+                                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                                NOTIFICATION_PERMISSION_REQUEST_CODE);
+                    }
+                }
+                Intent intent = new Intent(MainActivity.this, CallForegroundService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
         public void stopCallService() {
-            stopService(new Intent(MainActivity.this, CallForegroundService.class));
+            try {
+                isInCall = false;
+                stopService(new Intent(MainActivity.this, CallForegroundService.class));
+            } catch (Exception ignored) {}
         }
 
         private String getMimeType(String filename) {
@@ -285,6 +327,9 @@ public class MainActivity extends AppCompatActivity {
                 pendingPermissionRequest.deny();
             }
             pendingPermissionRequest = null;
+            return;
+        }
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
             return;
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
