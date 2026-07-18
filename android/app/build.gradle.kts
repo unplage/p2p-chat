@@ -10,8 +10,8 @@ android {
         applicationId = "com.p2pchat.app"
         minSdk = 21
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.2"
+        versionCode = 5
+        versionName = "1.2.0"
     }
 
     buildTypes {

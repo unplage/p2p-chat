@@ -321,9 +321,6 @@ let recordingStartTime = 0;
 // 屏幕唤醒锁
 let wakeLock = null;
 
-// 后台通话视频轨道替换
-let dummyVideoTrack = null;
-
 // ==================== 心跳检测相关 ====================
 let heartbeatInterval = null;
 let heartbeatTimeout = null;
@@ -1526,64 +1523,13 @@ function startStatsMonitor(pc) {
     // 已移除
 }
 
-// ==================== 后台视频轨道替换 ====================
-function createDummyVideoTrack() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 2;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, 2, 2);
-    const stream = canvas.captureStream(1);
-    return stream.getVideoTracks()[0];
-}
-
+// ==================== 后台不释放摄像头/麦克风 ====================
 function onAppPause() {
-    if (!isInCall || !localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (!videoTrack) return;
-    dummyVideoTrack = createDummyVideoTrack();
-    videoTrack.stop();
-    localStream.removeTrack(videoTrack);
-    localStream.addTrack(dummyVideoTrack);
-    if (currentCall) {
-        const pc = currentCall._pc || currentCall.peerConnection;
-        if (pc) {
-            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-            if (sender) sender.replaceTrack(dummyVideoTrack);
-        }
-    }
+    // 切到后台时保持摄像头和麦克风运行，不释放
 }
-
 async function onAppResume() {
-    if (!isInCall || !dummyVideoTrack) return;
-    try {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, frameRate: { ideal: 30 } },
-            audio: false
-        });
-        const newVideoTrack = newStream.getVideoTracks()[0];
-        if (currentCall) {
-            const pc = currentCall._pc || currentCall.peerConnection;
-            if (pc) {
-                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) await sender.replaceTrack(newVideoTrack);
-            }
-        }
-        localStream.removeTrack(dummyVideoTrack);
-        localStream.addTrack(newVideoTrack);
-        document.getElementById('localVideo').srcObject = localStream;
-        dummyVideoTrack.stop();
-        dummyVideoTrack = null;
-    } catch (e) {
-        console.error('恢复摄像头失败:', e);
-    }
+    // 切回前台无需重新获取媒体设备
 }
-
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) onAppPause();
-    else onAppResume();
-});
 
 // ==================== 音视频通话 ====================
 async function startCall(type) {
