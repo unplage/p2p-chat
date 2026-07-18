@@ -36,6 +36,13 @@ No build step. During dev **Hard Refresh** (Ctrl+F5) to bypass SW cache. Open `c
 - **Security**: `escapeHTML` on all user input (line 1189), image URLs restricted to `http://`/`https://`
 - **UI**: Chinese labels, English identifiers
 
+## Release checklist
+
+1. Bump SW cache version in `sw.js` and `android/app/src/main/assets/sw.js` (e.g. `v8` → `v9`)
+2. Update `versionCode` + `versionName` in `android/app/build.gradle.kts`
+3. Build APK: `./gradlew assembleDebug` (from `android/`)
+4. `git tag -a v<version> -m "<message>"` and push
+
 ## Pitfalls
 
 - SW scope is `/p2p-chat/`. If deploying elsewhere, `sw.js` auto-detects `BASE_PATH` from its own URL — no manual change needed.
