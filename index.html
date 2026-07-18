@@ -269,7 +269,8 @@ let fileTransferState = {
     receivedCount: 0,
     receivedSize: 0,
     writable: null,
-    useStream: false
+    useStream: false,
+    useAndroidStream: false
 };
 let receiveHistory = []; // 最近接收完成文件 [{ name, size }]
 let _pendingFileStart = null; // 接收队列：正在接收时暂存下一个文件信息
@@ -975,6 +976,15 @@ function sanitizeName(name) {
     return name.replace(/[\/\\\0<>:"|?*\x00-\x1f]/g, '_').substring(0, 240);
 }
 
+function uint8ArrayToBase64(u8a) {
+    let binary = '';
+    const len = u8a.length;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(u8a[i]);
+    }
+    return btoa(binary);
+}
+
 // 接收文件开始
 async function handleFileStart(info) {
     if (fileTransferState.receiving) {
@@ -991,8 +1001,28 @@ async function handleFileStart(info) {
     fileTransferState._nextStreamSeq = 0;
     fileTransferState.useStream = false;
     fileTransferState.writable = null;
+    fileTransferState.useAndroidStream = false;
     lastUIUpdate = 0;
     showReceivingFile(info);
+
+    // APK 端：使用 Android @JavascriptInterface 流式写入
+    if (typeof Android !== 'undefined' && Android.startFileSave) {
+        try {
+            Android.startFileSave(sanitizeName(info.name));
+            fileTransferState.useAndroidStream = true;
+            // 将对话框打开前已到达的 Map 数据写入流
+            const sortedSeqs = [...fileTransferState.receivedChunks.keys()].sort((a, b) => a - b);
+            for (const seq of sortedSeqs) {
+                Android.appendFileChunk(uint8ArrayToBase64(fileTransferState.receivedChunks.get(seq)));
+            }
+            fileTransferState.receivedChunks.clear();
+            addLog('📁 已启用 APK 流式写入', 'system');
+            return;
+        } catch (e) {
+            addLog(`APK 流式写入初始化失败: ${e.message}`, 'error');
+            fileTransferState.useAndroidStream = false;
+        }
+    }
 
     // 尝试流式写入（File System Access API），浏览器不支持时降级到 Map
     try {
@@ -1060,6 +1090,26 @@ function handleFileChunk(chunk) {
             updateReceiveProgress();
             lastUIUpdate = now;
         }
+    } else if (fileTransferState.useAndroidStream) {
+        // APK 流式写入：顺序分片直达磁盘，乱序暂存
+        if (seq === fileTransferState._nextStreamSeq) {
+            Android.appendFileChunk(uint8ArrayToBase64(data));
+            fileTransferState._nextStreamSeq++;
+            while (fileTransferState.receivedChunks.has(fileTransferState._nextStreamSeq)) {
+                const next = fileTransferState.receivedChunks.get(fileTransferState._nextStreamSeq);
+                fileTransferState.receivedChunks.delete(fileTransferState._nextStreamSeq);
+                Android.appendFileChunk(uint8ArrayToBase64(next));
+                fileTransferState._nextStreamSeq++;
+            }
+        } else if (!fileTransferState.receivedChunks.has(seq)) {
+            fileTransferState.receivedChunks.set(seq, data);
+        }
+        fileTransferState.receivedSize += data.length;
+        fileTransferState.receivedCount++;
+        if (now - lastUIUpdate > UI_UPDATE_INTERVAL) {
+            updateReceiveProgress();
+            lastUIUpdate = now;
+        }
     } else if (!fileTransferState.receivedChunks.has(seq)) {
         fileTransferState.receivedChunks.set(seq, data);
         fileTransferState.receivedSize += data.length;
@@ -1087,10 +1137,14 @@ async function handleFileComplete() {
     // 校验分片完整性
     if (info.chunks > 0 && (fileTransferState.receivedCount !== info.chunks || fileTransferState.receivedSize !== info.size)) {
         addLog(`文件 ${name} 接收不完整 (${fileTransferState.receivedCount}/${info.chunks} 片, ${formatSize(fileTransferState.receivedSize)}/${formatSize(info.size)})`, 'error');
+        if (fileTransferState.useAndroidStream && typeof Android !== 'undefined' && Android.cancelFileSave) {
+            try { Android.cancelFileSave(); } catch (_) {}
+        }
         fileTransferState.receiving = false;
         fileTransferState.receivedChunks = null;
         fileTransferState.receivedCount = 0;
         fileTransferState.receivedSize = 0;
+        fileTransferState.useAndroidStream = false;
         _pendingFileQueue = [];
         return;
     }
@@ -1103,24 +1157,22 @@ async function handleFileComplete() {
             addLog(`文件写入失败: ${e.message}`, 'error');
         }
         fileTransferState.writable = null;
+    } else if (fileTransferState.useAndroidStream) {
+        try {
+            Android.endFileSave();
+            addLog(`文件接收完成: ${name}`, 'success');
+        } catch (e) {
+            addLog(`文件写入失败: ${e.message}`, 'error');
+        }
     } else {
         const sorted = [...fileTransferState.receivedChunks.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1]);
         const blob = new Blob(sorted, { type: fileTransferState.fileInfo.type });
-        if (typeof Android !== 'undefined' && Android.saveFile) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const b64 = e.target.result.split(',')[1].replace(/\s/g, '');
-                Android.saveFile(name, b64);
-            };
-            reader.readAsDataURL(blob);
-        } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = name;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         addLog(`文件接收完成: ${name}`, 'success');
     }
 
@@ -1139,6 +1191,7 @@ async function handleFileComplete() {
     fileTransferState.receivedChunks = null;
     fileTransferState.receivedCount = 0;
     fileTransferState.receivedSize = 0;
+    fileTransferState.useAndroidStream = false;
     // 处理下一个排队文件
     if (_pendingFileQueue.length > 0) {
         handleFileStart(_pendingFileQueue.shift());

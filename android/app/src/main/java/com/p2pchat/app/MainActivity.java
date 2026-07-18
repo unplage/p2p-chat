@@ -38,6 +38,10 @@ public class MainActivity extends AppCompatActivity {
     private PermissionRequest pendingPermissionRequest;
     private static final int FILE_CHOOSER_REQUEST_CODE = 100;
     private static final int PERMISSION_REQUEST_CODE = 200;
+    private OutputStream currentOutStream;
+    private String currentFilename;
+    private Uri currentUri;
+    private File currentFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -138,37 +142,80 @@ public class MainActivity extends AppCompatActivity {
 
     public class FileSaver {
         @JavascriptInterface
-        public void saveFile(String filename, String base64Data) {
+        public void startFileSave(String filename) {
             try {
-                byte[] data = Base64.decode(base64Data, Base64.DEFAULT);
-                String dirName = "P2PChat";
-
+                currentFilename = filename;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     ContentValues values = new ContentValues();
                     values.put(MediaStore.Downloads.DISPLAY_NAME, filename);
                     values.put(MediaStore.Downloads.MIME_TYPE, getMimeType(filename));
-                    values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/" + dirName);
-                    Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-                    if (uri != null) {
-                        OutputStream out = getContentResolver().openOutputStream(uri);
-                        if (out != null) {
-                            out.write(data);
-                            out.close();
-                        }
-                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "✓ 已保存到 Downloads/" + dirName + "/" + filename, Toast.LENGTH_LONG).show());
+                    values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/P2PChat");
+                    currentUri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (currentUri != null) {
+                        currentOutStream = getContentResolver().openOutputStream(currentUri);
                     }
                 } else {
-                    File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), dirName);
+                    File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "P2PChat");
                     if (!dir.exists()) dir.mkdirs();
-                    File file = new File(dir, filename);
-                    FileOutputStream fos = new FileOutputStream(file);
-                    fos.write(data);
-                    fos.close();
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "✓ 已保存到 Downloads/" + dirName + "/" + filename, Toast.LENGTH_LONG).show());
+                    currentFile = new File(dir, filename);
+                    currentOutStream = new FileOutputStream(currentFile);
                 }
+                if (currentOutStream == null) {
+                    throw new RuntimeException("无法打开输出流");
+                }
+            } catch (Exception e) {
+                currentOutStream = null;
+                currentFilename = null;
+                currentUri = null;
+                currentFile = null;
+                throw new RuntimeException(e.getMessage());
+            }
+        }
+
+        @JavascriptInterface
+        public void appendFileChunk(String base64Chunk) {
+            if (currentOutStream == null) return;
+            try {
+                byte[] data = Base64.decode(base64Chunk, Base64.DEFAULT);
+                currentOutStream.write(data);
+            } catch (Exception e) {
+                throw new RuntimeException(e.getMessage());
+            }
+        }
+
+        @JavascriptInterface
+        public void endFileSave() {
+            try {
+                if (currentOutStream != null) {
+                    currentOutStream.close();
+                    currentOutStream = null;
+                }
+                final String fname = currentFilename;
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "✓ 已保存到 Downloads/P2PChat/" + fname, Toast.LENGTH_LONG).show());
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(MainActivity.this, "文件保存失败: " + e.getMessage(), Toast.LENGTH_LONG).show());
             }
+            currentFilename = null;
+            currentUri = null;
+            currentFile = null;
+        }
+
+        @JavascriptInterface
+        public void cancelFileSave() {
+            try {
+                if (currentOutStream != null) {
+                    currentOutStream.close();
+                    currentOutStream = null;
+                }
+                if (currentUri != null) {
+                    getContentResolver().delete(currentUri, null, null);
+                } else if (currentFile != null && currentFile.exists()) {
+                    currentFile.delete();
+                }
+            } catch (Exception ignored) {}
+            currentFilename = null;
+            currentUri = null;
+            currentFile = null;
         }
 
         private String getMimeType(String filename) {
