@@ -218,6 +218,21 @@ public class MainActivity extends AppCompatActivity {
             currentFile = null;
         }
 
+        @JavascriptInterface
+        public void startCallService() {
+            Intent intent = new Intent(MainActivity.this, CallForegroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+        }
+
+        @JavascriptInterface
+        public void stopCallService() {
+            stopService(new Intent(MainActivity.this, CallForegroundService.class));
+        }
+
         private String getMimeType(String filename) {
             String ext = filename.contains(".") ? filename.substring(filename.lastIndexOf('.') + 1).toLowerCase() : "";
             switch (ext) {

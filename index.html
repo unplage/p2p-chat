@@ -1611,6 +1611,9 @@ async function startCall(type) {
             }
         }
 
+        if (typeof Android !== 'undefined' && Android.startCallService) {
+            Android.startCallService();
+        }
     } catch (err) {
         addLog(`❌ 通话启动失败: ${err.message}`, 'error');
         console.error('通话错误详情:', err);
@@ -1708,6 +1711,10 @@ function handleIncomingCall(call) {
                     console.error('唤醒锁失败:', err);
                 }
             }
+
+            if (typeof Android !== 'undefined' && Android.startCallService) {
+                Android.startCallService();
+            }
         })
         .catch(err => {
             addLog(`❌ 无法获取媒体流: ${err.message}`, 'error');
@@ -1754,6 +1761,10 @@ function cleanupCall() {
     if (wakeLock) {
         wakeLock.release();
         wakeLock = null;
+    }
+
+    if (typeof Android !== 'undefined' && Android.stopCallService) {
+        Android.stopCallService();
     }
 }
 
