@@ -2,9 +2,16 @@ package com.p2pchat.app;
 
 import android.Manifest;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -45,6 +52,10 @@ public class MainActivity extends AppCompatActivity {
     private boolean isInCall = false;
     private boolean enteringPip = false;
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 300;
+    private AudioManager audioManager;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private String currentRoute = "speaker";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,6 +63,9 @@ public class MainActivity extends AppCompatActivity {
 
         webView = new WebView(this);
         setContentView(webView);
+
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -127,6 +141,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         webView.addJavascriptInterface(new FileSaver(), "Android");
+        registerNetworkListener();
 
         webView.loadUrl("file:///android_asset/index.html");
     }
@@ -246,10 +261,34 @@ public class MainActivity extends AppCompatActivity {
             currentFile = null;
         }
 
+        /** 切换通话音频输出：speaker / earpiece / bluetooth */
+        @JavascriptInterface
+        public void setAudioRoute(String route) {
+            applyAudioRoute(route);
+        }
+
+        @JavascriptInterface
+        public String getAudioRoute() {
+            return currentRoute;
+        }
+
+        /** 当前网络类型：wifi / cellular / ethernet / none / unknown */
+        @JavascriptInterface
+        public String getNetworkType() {
+            return currentNetworkType();
+        }
+
+        /** 监听网络变化，回调 window.onNetworkTypeChanged(type) */
+        @JavascriptInterface
+        public void registerNetworkCallback() {
+            registerNetworkListener();
+        }
+
         @JavascriptInterface
         public void startCallService() {
             try {
                 isInCall = true;
+                enterCommunicationMode();
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.POST_NOTIFICATIONS)
                             != PackageManager.PERMISSION_GRANTED) {
@@ -271,6 +310,7 @@ public class MainActivity extends AppCompatActivity {
         public void stopCallService() {
             try {
                 isInCall = false;
+                exitCommunicationMode();
                 stopService(new Intent(MainActivity.this, CallForegroundService.class));
             } catch (Exception ignored) {}
         }
@@ -288,6 +328,138 @@ public class MainActivity extends AppCompatActivity {
                 default: return "application/octet-stream";
             }
         }
+    }
+
+    // ==================== 通话音频路由 ====================
+    private void enterCommunicationMode() {
+        if (audioManager == null) return;
+        try {
+            audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            applyAudioRoute(currentRoute);
+        } catch (Exception ignored) {}
+    }
+
+    private void exitCommunicationMode() {
+        if (audioManager == null) return;
+        try {
+            audioManager.setMode(AudioManager.MODE_NORMAL);
+            audioManager.stopBluetoothSco();
+            audioManager.setBluetoothScoOn(false);
+        } catch (Exception ignored) {}
+    }
+
+    private void applyAudioRoute(String route) {
+        if (audioManager == null) return;
+        if (route == null || route.isEmpty()) route = "speaker";
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AudioDeviceInfo target = findOutputDevice(route);
+                if (target != null) {
+                    audioManager.setCommunicationDevice(target);
+                    currentRoute = route;
+                    return;
+                }
+            }
+            boolean speaker = "speaker".equals(route);
+            audioManager.setSpeakerphoneOn(speaker);
+            if ("bluetooth".equals(route)) {
+                audioManager.startBluetoothSco();
+                audioManager.setBluetoothScoOn(true);
+            } else {
+                audioManager.setBluetoothScoOn(false);
+                audioManager.stopBluetoothSco();
+            }
+            currentRoute = route;
+        } catch (Exception ignored) {}
+    }
+
+    @SuppressWarnings("deprecation")
+    private AudioDeviceInfo findOutputDevice(String route) {
+        if (audioManager == null) return null;
+        int wanted;
+        switch (route) {
+            case "earpiece": wanted = AudioDeviceInfo.TYPE_BUILTIN_EARPIECE; break;
+            case "bluetooth": wanted = AudioDeviceInfo.TYPE_BLUETOOTH_SCO; break;
+            default: wanted = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER; break;
+        }
+        AudioDeviceInfo fallback = null;
+        for (AudioDeviceInfo device : audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+            if (device.getType() == wanted) return device;
+            if ("bluetooth".equals(route) && fallback == null
+                    && device.getType() == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
+                fallback = device;
+            }
+        }
+        return fallback;
+    }
+
+    // ==================== 网络类型 ====================
+    private String currentNetworkType() {
+        if (connectivityManager == null) return "unknown";
+        try {
+            Network network = connectivityManager.getActiveNetwork();
+            if (network == null) return "none";
+            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
+            return typeFromCapabilities(caps);
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    private String typeFromCapabilities(NetworkCapabilities caps) {
+        if (caps == null) return "unknown";
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return "wifi";
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "cellular";
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "ethernet";
+        return "unknown";
+    }
+
+    private void registerNetworkListener() {
+        if (connectivityManager == null || networkCallback != null) return;
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+                notifyNetworkType(typeFromCapabilities(caps));
+            }
+
+            @Override
+            public void onLost(Network network) {
+                notifyNetworkType(currentNetworkType());
+            }
+        };
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                connectivityManager.registerDefaultNetworkCallback(networkCallback);
+            } else {
+                NetworkRequest request = new NetworkRequest.Builder()
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        .build();
+                connectivityManager.registerNetworkCallback(request, networkCallback);
+            }
+        } catch (Exception e) {
+            networkCallback = null;
+        }
+    }
+
+    private void notifyNetworkType(String type) {
+        if (webView == null || type == null) return;
+        try {
+            webView.evaluateJavascript(
+                    "typeof onNetworkTypeChanged === 'function' && onNetworkTypeChanged('" + type + "')",
+                    null);
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            if (connectivityManager != null && networkCallback != null) {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+                networkCallback = null;
+            }
+        } catch (Exception ignored) {}
+        exitCommunicationMode();
+        super.onDestroy();
     }
 
     @Override

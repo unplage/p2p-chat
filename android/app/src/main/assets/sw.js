@@ -8,7 +8,7 @@ const BASE_PATH = self.location.pathname.replace(/[^/]+$/, '');
 const PROJECT = BASE_PATH.replace(/^\/+|\/+$/g, '').replace(/\//g, '-') || 'root';
 // 缓存前缀必须带项目名与分隔符，避免项目名互为前缀时互相误删（如 p2p 与 p2p-chat）
 const CACHE_PREFIX = `pwa-cache-${PROJECT}--`;
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 // 旧版本命名（pwa-cache-p2p-chat-v11），仅用于迁移时清理本项目遗留缓存
 const LEGACY_CACHE_RE = PROJECT === 'root'
@@ -26,6 +26,7 @@ const PRECACHE_URLS = [
   `${BASE_PATH}index.html`,
   `${BASE_PATH}manifest.json`,
   `${BASE_PATH}peerjs.min.js`,
+  `${BASE_PATH}net.js`,
   `${BASE_PATH}icons/icon-192.png`,
   `${BASE_PATH}icons/icon-512.png`,
   `${BASE_PATH}icons/icon-maskable-192.png`,
