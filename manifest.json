@@ -1,23 +1,47 @@
 {
-    "name": "点对点加密通话- 安全的通话机制",
+    "name": "点对点加密通话 - 安全的通话机制",
     "short_name": "P2PChat",
-    "description": "一个功能强大的加密通讯以及文件传输 PWA 应用",
-    "start_url": "/p2p-chat/",
+    "description": "无需注册，房间号直连的加密聊天、文件传输与音视频通话 PWA",
+    "lang": "zh-CN",
+    "dir": "ltr",
+    "id": "./",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#f5f5f5",
-    "theme_color": "#4CAF50",
+    "theme_color": "#07C160",
     "orientation": "portrait",
-    "scope": "/p2p-chat/",
+    "categories": ["social", "communication", "productivity"],
     "icons": [
         {
-            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%234CAF50' width='192' height='192' rx='20'/%3E%3Ctext x='96' y='120' font-size='80' text-anchor='middle' fill='white'%3EP%3C/text%3E%3C/svg%3E",
+            "src": "./icons/icon-192.png",
             "sizes": "192x192",
-            "type": "image/svg+xml"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
-            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%234CAF50' width='512' height='512' rx='40'/%3E%3Ctext x='256' y='320' font-size='200' text-anchor='middle' fill='white'%3EP%3C/text%3E%3C/svg%3E",
+            "src": "./icons/icon-512.png",
             "sizes": "512x512",
-            "type": "image/svg+xml"
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "./icons/icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "./icons/icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "./icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
         }
     ]
 }

@@ -23,6 +23,8 @@
 | `index.html` | 全部 UI 与逻辑（~1350 行） |
 | `sw.js` | Service Worker，网络优先 HTML，缓存优先静态资源 |
 | `manifest.json` | PWA 配置，standalone 模式 |
+| `icons/` | PWA 图标（192/512 any + maskable、apple-touch-icon、favicon） |
+| `tools/make_icons.py` | 图标生成脚本（`python3 tools/make_icons.py`，需 cairosvg + Pillow） |
 | `clear.html` | 一键清除 PWA 缓存 / IndexedDB |
 
 ## 快速开始
@@ -50,6 +52,11 @@ python3 -m http.server 8080
 - 所有用户输入经过 `escapeHTML` 防 XSS
 - 图片 URL 仅允许 `http://` / `https://` 协议
 - 多 TURN 中继服务器，SRTP 加密
+
+### 缓存隔离（GitHub Pages 多 PWA 共存）
+- 缓存名格式 `pwa-cache-<项目>--v<版本>`，项目名取自 `sw.js` 自身路径
+- `activate` 只删除本项目前缀的旧缓存，其它 PWA 的缓存一律不动
+- 所有缓存查找都限定在本项目缓存内，只拦截本项目作用域的同源 GET 请求
 
 ## 部署
 
